@@ -354,7 +354,7 @@ export default function UploadScreen() {
             <FadeInView delay={0}>
               <AppCard style={[styles.modeInfoCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
                 <View style={styles.selectedModesRow}>
-                  <MaterialCommunityIcons name="check-multiple" size={20} color={colors.primary} />
+                  <MaterialCommunityIcons name="check-all" size={20} color={colors.primary} />
                   <Text style={[styles.selectedModesText, { color: colors.textPrimary }]}>
                     {selectedModes.length} mode{selectedModes.length > 1 ? 's' : ''} selected
                   </Text>

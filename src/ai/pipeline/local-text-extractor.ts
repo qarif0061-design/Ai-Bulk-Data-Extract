@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 
 let tesseractModule: any = null;
 
@@ -32,32 +33,27 @@ async function extractTextFromPdf(fileUri: string): Promise<string> {
   if (Platform.OS === 'web') {
     try {
       const pdfjsLib = await import('pdfjs-dist');
-
-      // Set up worker properly for web
       pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
       const response = await fetch(fileUri);
       if (!response.ok) throw new Error(`Fetch PDF failed: ${response.status}`);
       const data = await response.arrayBuffer();
 
-      const loadingTask = pdfjsLib.getDocument({
+      const pdf = await pdfjsLib.getDocument({
         data,
         useWorkerFetch: false,
         isEvalSupported: false,
         useSystemFonts: true,
         disableFontFace: true,
-      });
+      }).promise;
 
-      const pdf = await loadingTask.promise;
       let text = '';
-
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
         const strings = content.items.map((item: any) => item.str);
         text += strings.join(' ') + '\n\n';
       }
-
       return text.trim();
     } catch (e: any) {
       console.warn('PDF text extraction failed on web:', e?.message);
@@ -67,9 +63,8 @@ async function extractTextFromPdf(fileUri: string): Promise<string> {
 
   // Native path
   try {
-    const FileSystem = await import('expo-file-system');
-    const base64 = await FileSystem.default.readAsStringAsync(fileUri, {
-      encoding: FileSystem.default.EncodingType.Base64,
+    const base64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
     const { PDFParser } = await import('react-native-pdf-parser');
     const parser = new PDFParser();
@@ -90,7 +85,6 @@ async function extractTextFromImage(fileUri: string): Promise<string> {
         return '';
       }
 
-      // Fetch the image as a blob, then create an object URL for Tesseract
       const response = await fetch(fileUri);
       if (!response.ok) throw new Error(`Fetch image failed: ${response.status}`);
       const blob = await response.blob();
@@ -98,8 +92,7 @@ async function extractTextFromImage(fileUri: string): Promise<string> {
 
       try {
         const result = await Tesseract.recognize(objectUrl, 'eng', {});
-        const text = result?.data?.text || '';
-        return text;
+        return result?.data?.text || '';
       } finally {
         URL.revokeObjectURL(objectUrl);
       }
@@ -109,18 +102,6 @@ async function extractTextFromImage(fileUri: string): Promise<string> {
     }
   }
 
-  // Native path
-  try {
-    const FileSystem = await import('expo-file-system');
-    const base64 = await FileSystem.default.readAsStringAsync(fileUri, {
-      encoding: FileSystem.default.EncodingType.Base64,
-    });
-    const Tesseract = await getTesseract();
-    if (!Tesseract) return '';
-    const result = await Tesseract.recognize(`data:image/jpeg;base64,${base64}`, 'eng', {});
-    return result?.data?.text || '';
-  } catch (e: any) {
-    console.warn('Image OCR failed on native:', e?.message);
-    return '';
-  }
+  // Native: no Tesseract available, return empty to trigger AI fallback
+  return '';
 }
