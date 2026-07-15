@@ -5,6 +5,7 @@ import { AiProviderFactory } from '../../ai/abstraction/ai-provider-factory';
 import { FirestoreService } from '../../shared/services/firestore-service';
 import { JobModel, JobStatus } from '../../shared/models/job-model';
 import { useAuthStore } from '../../shared/hooks/use-auth';
+import { useApiKeyStore } from '../../shared/hooks/use-api-key';
 import { AI_CONFIG } from '../../core/config/app-config';
 
 interface ExtractionState {
@@ -63,6 +64,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({ currentJobId: jobId });
 
+      const apiKey = useApiKeyStore.getState().apiKey;
       const provider = AiProviderFactory.createOpenRouterProvider({
         apiKey: apiKey || '',
         model: AI_CONFIG.defaultModel,

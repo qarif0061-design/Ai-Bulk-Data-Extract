@@ -5,64 +5,64 @@ export interface ExtractionPrompt {
   userPrompt: string;
 }
 
-export const EXTRACTION_PROMPTS: Record<ExtractionMode, (content: string, customPrompt?: string) => ExtractionPrompt> = {
-  [ExtractionMode.TABLES]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Extract all tabular data from the provided content. Return data as structured JSON with headers as keys and rows as arrays of values.',
-    userPrompt: `Extract all tables from the following content. For each table, provide the headers and rows.\n\nContent:\n${content}\n\nReturn the result as a JSON object with this structure:\n{\n  "tables": [\n    {\n      "headers": ["col1", "col2", ...],\n      "rows": [["val1", "val2", ...], ...]\n    }\n  ]\n}`,
+export const EXTRACTION_PROMPTS: Record<ExtractionMode, (fileName: string, customPrompt?: string) => ExtractionPrompt> = {
+  [ExtractionMode.TABLES]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF document. Look carefully at the visual content and extract ALL tabular data visible. Return data as structured JSON with headers as keys and rows as arrays of values. Be thorough - extract every table you can see.',
+    userPrompt: `Look at the attached document "${fileName}". Extract ALL tables and tabular data visible in this document.\n\nFor each table, provide:\n- headers: array of column header strings\n- rows: array of arrays, each inner array is one row of values\n\nReturn ONLY valid JSON:\n{"tables": [{"headers": ["col1", "col2"], "rows": [["val1", "val2"], ...]}]}`,
   }),
 
-  [ExtractionMode.EMAILS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Find all email addresses in the provided content.',
-    userPrompt: `Find all email addresses in the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "emails": [\n    {\n      "email": "example@domain.com",\n      "context": "surrounding text where found"\n    }\n  ]\n}`,
+  [ExtractionMode.EMAILS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL email addresses visible. Be thorough.',
+    userPrompt: `Look at the attached document "${fileName}". Find every email address visible in this document.\n\nReturn ONLY valid JSON:\n{"emails": [{"email": "example@domain.com", "context": "surrounding text where found"}]}`,
   }),
 
-  [ExtractionMode.PHONE_NUMBERS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Find all phone numbers in the provided content and normalize them.',
-    userPrompt: `Find all phone numbers in the following content. Normalize each to international format where possible.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "phoneNumbers": [\n    {\n      "original": "as found in text",\n      "normalized": "+1 234 567 8900",\n      "country": "US",\n      "type": "mobile/landline"\n    }\n  ]\n}`,
+  [ExtractionMode.PHONE_NUMBERS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL phone numbers visible. Normalize them to a standard format.',
+    userPrompt: `Look at the attached document "${fileName}". Find every phone number visible in this document.\n\nReturn ONLY valid JSON:\n{"phoneNumbers": [{"original": "as shown", "normalized": "+1 234 567 8900", "country": "US", "type": "mobile/landline"}]}`,
   }),
 
-  [ExtractionMode.ADDRESSES]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Parse all postal addresses from the provided content.',
-    userPrompt: `Extract all postal addresses from the following content. Parse them into structured components.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "addresses": [\n    {\n      "street": "123 Main St",\n      "city": "Springfield",\n      "state": "IL",\n      "zip": "62701",\n      "country": "USA",\n      "full": "123 Main St, Springfield, IL 62701, USA"\n    }\n  ]\n}`,
+  [ExtractionMode.ADDRESSES]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL postal addresses visible. Parse them into structured components.',
+    userPrompt: `Look at the attached document "${fileName}". Extract every postal address visible in this document.\n\nReturn ONLY valid JSON:\n{"addresses": [{"street": "123 Main St", "city": "Springfield", "state": "IL", "zip": "62701", "country": "USA", "full": "123 Main St, Springfield, IL 62701, USA"}]}`,
   }),
 
-  [ExtractionMode.PRODUCTS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Extract product details from the provided content.',
-    userPrompt: `Extract all products from the following content with their details.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "products": [\n    {\n      "name": "Product Name",\n      "description": "Brief description",\n      "sku": "SKU if available",\n      "quantity": "quantity if mentioned",\n      "price": "price if available"\n    }\n  ]\n}`,
+  [ExtractionMode.PRODUCTS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL product details visible. Be thorough - get every product, its name, description, SKU, quantity, and price.',
+    userPrompt: `Look at the attached document "${fileName}". Extract every product or item listed in this document with all available details.\n\nReturn ONLY valid JSON:\n{"products": [{"name": "Product Name", "description": "Brief description", "sku": "SKU if available", "quantity": "quantity if mentioned", "price": "price if available"}]}`,
   }),
 
-  [ExtractionMode.PRICES]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Find all prices and monetary values in the provided content.',
-    userPrompt: `Find all prices and monetary values in the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "prices": [\n    {\n      "amount": 29.99,\n      "currency": "USD",\n      "symbol": "$",\n      "context": "surrounding text",\n      "label": "description of what this price is for"\n    }\n  ]\n}`,
+  [ExtractionMode.PRICES]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL prices and monetary values visible.',
+    userPrompt: `Look at the attached document "${fileName}". Find every price and monetary value visible in this document.\n\nReturn ONLY valid JSON:\n{"prices": [{"amount": 29.99, "currency": "USD", "symbol": "$", "context": "surrounding text", "label": "what this price is for"}]}`,
   }),
 
-  [ExtractionMode.INVOICE_ITEMS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Extract line items from invoices in the provided content.',
-    userPrompt: `Extract all line items from the invoice(s) in the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "invoiceItems": [\n    {\n      "description": "Item description",\n      "quantity": 1,\n      "unitPrice": 29.99,\n      "total": 29.99,\n      "tax": 0,\n      "discount": 0\n    }\n  ],\n  "subtotal": 0,\n  "tax": 0,\n  "total": 0,\n  "invoiceNumber": "INV-001",\n  "date": "2024-01-15"\n}`,
+  [ExtractionMode.INVOICE_ITEMS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF of an invoice. Look carefully at the visual content and extract ALL line items, totals, tax, invoice number, and date. Be extremely thorough.',
+    userPrompt: `Look at the attached invoice document "${fileName}". Extract every line item and all invoice details.\n\nReturn ONLY valid JSON:\n{"invoiceItems": [{"description": "Item description", "quantity": 1, "unitPrice": 29.99, "total": 29.99, "tax": 0, "discount": 0}], "subtotal": 0, "tax": 0, "total": 0, "invoiceNumber": "INV-001", "date": "2024-01-15"}`,
   }),
 
-  [ExtractionMode.DATES]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Find and normalize all dates in the provided content.',
-    userPrompt: `Find all dates in the following content and normalize them to ISO 8601 format.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "dates": [\n    {\n      "original": "as found in text",\n      "normalized": "2024-01-15",\n      "type": "date/datetime/time",\n      "context": "surrounding text"\n    }\n  ]\n}`,
+  [ExtractionMode.DATES]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and find ALL dates visible. Normalize them to ISO 8601 format.',
+    userPrompt: `Look at the attached document "${fileName}". Find every date visible in this document.\n\nReturn ONLY valid JSON:\n{"dates": [{"original": "as shown", "normalized": "2024-01-15", "type": "date/datetime/time", "context": "surrounding text"}]}`,
   }),
 
-  [ExtractionMode.BANK_TRANSACTIONS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Extract bank transaction data from statements.',
-    userPrompt: `Extract all bank transactions from the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "transactions": [\n    {\n      "date": "2024-01-15",\n      "description": "Transaction description",\n      "amount": 100.00,\n      "type": "credit/debit",\n      "balance": 5000.00,\n      "reference": "reference number if available"\n    }\n  ],\n  "openingBalance": 0,\n  "closingBalance": 0,\n  "accountNumber": "****1234"\n}`,
+  [ExtractionMode.BANK_TRANSACTIONS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF of a bank statement. Look carefully at the visual content and extract ALL transactions visible.',
+    userPrompt: `Look at the attached bank statement "${fileName}". Extract every transaction visible in this document.\n\nReturn ONLY valid JSON:\n{"transactions": [{"date": "2024-01-15", "description": "Transaction description", "amount": 100.00, "type": "credit/debit", "balance": 5000.00, "reference": "ref if available"}], "openingBalance": 0, "closingBalance": 0, "accountNumber": "****1234"}`,
   }),
 
-  [ExtractionMode.CONTACTS]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Extract contact information from the provided content.',
-    userPrompt: `Extract all contact information from the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "contacts": [\n    {\n      "name": "Full Name",\n      "email": "email if available",\n      "phone": "phone if available",\n      "company": "company if available",\n      "title": "job title if available",\n      "address": "address if available"\n    }\n  ]\n}`,
+  [ExtractionMode.CONTACTS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and extract ALL contact information visible.',
+    userPrompt: `Look at the attached document "${fileName}". Extract every contact or person's information visible.\n\nReturn ONLY valid JSON:\n{"contacts": [{"name": "Full Name", "email": "email if available", "phone": "phone if available", "company": "company if available", "title": "job title if available", "address": "address if available"}]}`,
   }),
 
-  [ExtractionMode.COMPANY_NAMES]: (content: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Identify all company and business names in the provided content.',
-    userPrompt: `Identify all company and business names in the following content.\n\nContent:\n${content}\n\nReturn the result as a JSON object:\n{\n  "companies": [\n    {\n      "name": "Company Name",\n      "type": "Corporation/LLC/etc",\n      "context": "surrounding text where found",\n      "website": "if available",\n      "industry": "if determinable"\n    }\n  ]\n}`,
+  [ExtractionMode.COMPANY_NAMES]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and identify ALL company and business names visible.',
+    userPrompt: `Look at the attached document "${fileName}". Identify every company and business name visible in this document.\n\nReturn ONLY valid JSON:\n{"companies": [{"name": "Company Name", "type": "Corporation/LLC/etc", "context": "surrounding text", "website": "if available", "industry": "if determinable"}]}`,
   }),
 
-  [ExtractionMode.CUSTOM]: (content: string, customPrompt?: string) => ({
-    systemPrompt: 'You are a precise data extraction assistant. Follow the user instructions to extract data from the provided content.',
-    userPrompt: `${customPrompt || 'Extract all relevant data'}\n\nContent:\n${content}\n\nReturn the result as a structured JSON object matching the requested extraction.`,
+  [ExtractionMode.CUSTOM]: (fileName: string, customPrompt?: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant. You will be given an image or PDF. Look carefully at the visual content and follow the user instructions to extract data.',
+    userPrompt: `${customPrompt || 'Extract all relevant data from this document.'}\n\nLook at the attached document "${fileName}". Follow the instructions above and extract the requested data.\n\nReturn ONLY valid JSON matching the requested extraction.`,
   }),
 };

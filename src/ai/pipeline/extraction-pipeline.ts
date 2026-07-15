@@ -78,13 +78,13 @@ export class ExtractionPipeline {
   }
 
   private async processFile(processed: ProcessedFile): Promise<AiResponseImpl> {
-    const content = PromptBuilder.buildFileContent(processed.fileUri, processed.content, processed.fileName);
-    const truncatedContent = PromptBuilder.truncateContent(content);
-    const prompt = PromptBuilder.build(this.mode, truncatedContent, this.customPrompt);
+    const prompt = PromptBuilder.build(this.mode, processed.fileName, this.customPrompt);
 
     const response = await this.provider.sendRequest({
       systemPrompt: prompt.systemPrompt,
       userPrompt: prompt.userPrompt,
+      imageBase64: processed.base64Data,
+      imageMimeType: processed.mimeType,
     });
 
     if (response.success && response.content) {

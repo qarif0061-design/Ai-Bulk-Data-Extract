@@ -21,6 +21,7 @@ import { FadeInView } from '../../src/shared/components/animated';
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useSubscriptionStore } from '../../src/features/subscription/subscription-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
+import { useApiKeyStore } from '../../src/shared/hooks/use-api-key';
 import { SUBSCRIPTION_CONFIGS } from '../../src/core/enums/subscription-tier';
 
 function SettingRow({ icon, label, value, onPress, colors, chevron = true }: { icon: string; label: string; value?: string; onPress?: () => void; colors: any; chevron?: boolean }) {
@@ -53,12 +54,15 @@ export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useThemeStore();
   const { userModel, isAuthenticated, logout } = useAuthStore();
   const { config, creditsRemaining, creditsUsed, loadSubscription, getUsagePercent, getCreditsPercent } = useSubscriptionStore();
+  const { apiKey, setApiKey, loadApiKey } = useApiKeyStore();
   const [editMode, setEditMode] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [bio, setBio] = useState('');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState('');
 
-  useEffect(() => { loadSubscription(); }, []);
+  useEffect(() => { loadSubscription(); loadApiKey(); }, []);
   useEffect(() => {
     if (userModel) setDisplayName(userModel.displayName || '');
   }, [userModel]);
@@ -103,6 +107,37 @@ export default function ProfileScreen() {
 
           <FadeInView delay={150}>
             <AppCard style={[styles.signInCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <MaterialCommunityIcons name="key-variant" size={32} color={colors.primary} />
+              <Text style={[styles.signInTitle, { color: colors.textPrimary }]}>API Key Required</Text>
+              <Text style={[styles.signInSub, { color: colors.textSecondary }]}>
+                Add your OpenRouter API key to enable AI extraction. Get a free key at openrouter.ai
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
+                placeholder="sk-or-v1-..."
+                placeholderTextColor={colors.textTertiary}
+                value={tempApiKey || apiKey}
+                onChangeText={setTempApiKey}
+                secureTextEntry={!showApiKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.apiKeyRow}>
+                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
+                  <Text style={[styles.apiKeyToggle, { color: colors.primary }]}>{showApiKey ? 'Hide' : 'Show'}</Text>
+                </TouchableOpacity>
+                <AppButton
+                  title="Save"
+                  size="small"
+                  onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved securely.'); }}
+                  disabled={!tempApiKey.trim()}
+                />
+              </View>
+            </AppCard>
+          </FadeInView>
+
+          <FadeInView delay={200}>
+            <AppCard style={[styles.signInCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
               <MaterialCommunityIcons name="login" size={32} color={colors.primary} />
               <Text style={[styles.signInTitle, { color: colors.textPrimary }]}>Sign In Required</Text>
               <Text style={[styles.signInSub, { color: colors.textSecondary }]}>
@@ -112,7 +147,7 @@ export default function ProfileScreen() {
             </AppCard>
           </FadeInView>
 
-          <FadeInView delay={200}>
+          <FadeInView delay={250}>
             <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Subscription Plans</Text>
             {tiers.map((tierConfig) => (
               <AppCard key={tierConfig.tier} style={[styles.planCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
@@ -201,6 +236,30 @@ export default function ProfileScreen() {
               onPress={() => setNotificationsEnabled(!notificationsEnabled)} />
             <SettingRow icon="translate" label="Language" value="English" colors={colors}
               onPress={() => Alert.alert('Language', 'Language settings coming soon')} />
+            <View style={{ marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary, marginBottom: 8 }]}>OpenRouter API Key</Text>
+              <TextInput
+                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
+                placeholder="sk-or-v1-..."
+                placeholderTextColor={colors.textTertiary}
+                value={tempApiKey || apiKey}
+                onChangeText={setTempApiKey}
+                secureTextEntry={!showApiKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={styles.apiKeyRow}>
+                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
+                  <Text style={[styles.apiKeyToggle, { color: colors.primary }]}>{showApiKey ? 'Hide' : 'Show'}</Text>
+                </TouchableOpacity>
+                <AppButton
+                  title="Save"
+                  size="small"
+                  onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved securely.'); }}
+                  disabled={!tempApiKey.trim()}
+                />
+              </View>
+            </View>
           </AppCard>
         </FadeInView>
 
@@ -305,4 +364,7 @@ const styles = StyleSheet.create({
   featureText: { fontSize: 13 },
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 1.5, borderRadius: 14, gap: 8, marginTop: 8 },
   logoutText: { fontSize: 15, fontWeight: '700' },
+  apiKeyInput: { borderWidth: 1.5, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'monospace', marginTop: 8 },
+  apiKeyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
+  apiKeyToggle: { fontSize: 13, fontWeight: '600' },
 });

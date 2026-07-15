@@ -8,6 +8,7 @@ export interface ProcessedFile {
   fileUri: string;
   mimeType: string;
   content: string;
+  base64Data: string;
   isImage: boolean;
 }
 
@@ -20,12 +21,12 @@ export class OcrProcessor {
     const mimeType = getFileMimeType(fileName);
     const isImage = mimeType.startsWith('image/');
 
-    let content: string;
+    let base64Data: string;
 
     if (isImage) {
-      content = await this.processImage(fileUri, fileName);
+      base64Data = await this.readImageAsBase64(fileUri);
     } else if (mimeType === 'application/pdf') {
-      content = await this.processPdf(fileUri, fileName);
+      base64Data = await this.readPdfAsBase64(fileUri);
     } else {
       throw new FileException(`Cannot process file type: ${mimeType}`, 'unsupported-file-type');
     }
@@ -34,29 +35,42 @@ export class OcrProcessor {
       fileName,
       fileUri,
       mimeType,
-      content,
+      content: `[${isImage ? 'Image' : 'PDF'}: ${fileName}]`,
+      base64Data,
       isImage,
     };
   }
 
-  private static async processImage(fileUri: string, fileName: string): Promise<string> {
+  private static async readImageAsBase64(fileUri: string): Promise<string> {
     try {
       const base64 = await FileSystem.readAsStringAsync(fileUri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      return `[Image file: ${fileName}]\nBase64 encoded image data available for AI vision processing.\nImage size: ${Math.round(base64.length * 0.75 / 1024)}KB`;
+      if (!base64 || base64.length < 100) {
+        throw new Error('Base64 data too short, file may be corrupted');
+      }
+      return base64;
     } catch (error: any) {
       throw new FileException(`Failed to read image: ${error.message}`, 'read-error');
     }
   }
 
-  private static async processPdf(fileUri: string, fileName: string): Promise<string> {
+  private static async readPdfAsBase64(fileUri: string): Promise<string> {
     try {
       const fileInfo = await FileSystem.getInfoAsync(fileUri);
       if (!fileInfo.exists) {
         throw new FileException('File does not exist', 'file-not-found');
       }
-      return `[PDF file: ${fileName}]\nFile size: ${Math.round(fileInfo.size / 1024)}KB\nPDF content will be processed by the AI model.`;
+      if (fileInfo.size > 20 * 1024 * 1024) {
+        throw new FileException('PDF file too large (max 20MB)', 'file-too-large');
+      }
+      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      if (!base64 || base64.length < 100) {
+        throw new Error('Base64 data too short, file may be corrupted or encrypted');
+      }
+      return base64;
     } catch (error: any) {
       if (error instanceof FileException) throw error;
       throw new FileException(`Failed to read PDF: ${error.message}`, 'read-error');

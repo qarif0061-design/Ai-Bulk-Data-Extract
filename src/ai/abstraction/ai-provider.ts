@@ -11,6 +11,8 @@ export interface AiRequest {
   userPrompt: string;
   maxTokens?: number;
   temperature?: number;
+  imageBase64?: string;
+  imageMimeType?: string;
 }
 
 export interface AiProvider {

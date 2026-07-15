@@ -1,6 +1,12 @@
 import { AiProvider, AiProviderConfig, AiRequest, AiResponse } from '../abstraction/ai-provider';
 import { AI_CONFIG } from '../../core/config/app-config';
 
+export interface VisionContent {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: { url: string };
+}
+
 export class OpenRouterProvider implements AiProvider {
   name = 'openrouter';
   private config: AiProviderConfig;
@@ -18,12 +24,30 @@ export class OpenRouterProvider implements AiProvider {
   async sendRequest(request: AiRequest): Promise<AiResponse> {
     const url = `${this.config.baseUrl}/chat/completions`;
 
+    const messages: any[] = [
+      { role: 'system', content: request.systemPrompt },
+    ];
+
+    if (request.imageBase64 && request.imageMimeType) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: request.userPrompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${request.imageMimeType};base64,${request.imageBase64}`,
+            },
+          },
+        ],
+      });
+    } else {
+      messages.push({ role: 'user', content: request.userPrompt });
+    }
+
     const body = {
       model: this.config.model,
-      messages: [
-        { role: 'system', content: request.systemPrompt },
-        { role: 'user', content: request.userPrompt },
-      ],
+      messages,
       max_tokens: request.maxTokens || this.config.maxTokens,
       temperature: request.temperature ?? this.config.temperature,
     };

@@ -6,15 +6,18 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/shared/hooks/use-auth';
 import { useThemeStore } from '../src/shared/hooks/use-theme';
+import { useApiKeyStore } from '../src/shared/hooks/use-api-key';
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const { initAuth, isLoading } = useAuthStore();
   const { mode, loadTheme } = useThemeStore();
+  const { loadApiKey } = useApiKeyStore();
 
   useEffect(() => {
     loadTheme();
+    loadApiKey();
     const unsubscribe = initAuth();
     return unsubscribe;
   }, []);
