@@ -64,7 +64,7 @@ async function extractTextFromPdf(fileUri: string): Promise<string> {
   // Native path
   try {
     const base64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
+      encoding: 'base64',
     });
     const { PDFParser } = await import('react-native-pdf-parser');
     const parser = new PDFParser();

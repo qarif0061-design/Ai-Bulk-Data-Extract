@@ -11,7 +11,7 @@ export async function readFileAsBase64(fileUri: string): Promise<string> {
     return readFileAsBase64Web(fileUri);
   }
   return FileSystem.readAsStringAsync(fileUri, {
-    encoding: FileSystem.EncodingType.Base64,
+    encoding: 'base64',
   });
 }
 

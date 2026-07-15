@@ -30,7 +30,7 @@ export const StorageService = {
   async uploadImageAsBase64(userId: string, fileUri: string, fileName: string): Promise<string> {
     try {
       const base64 = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: 'base64',
       });
       return `data:image/jpeg;base64,${base64}`;
     } catch (error: any) {
