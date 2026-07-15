@@ -8,7 +8,6 @@ import {
   Alert,
   Switch,
   Linking,
-  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,8 +20,7 @@ import { SubscriptionPlansModal } from '../../src/shared/components/subscription
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useSubscriptionStore } from '../../src/features/subscription/subscription-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
-import { useApiKeyStore } from '../../src/shared/hooks/use-api-key';
-import { SUBSCRIPTION_CONFIGS, SubscriptionTier } from '../../src/core/enums/subscription-tier';
+import { SubscriptionTier } from '../../src/core/enums/subscription-tier';
 
 function SettingRow({ icon, label, value, onPress, colors, chevron = true }: { icon: string; label: string; value?: string; onPress?: () => void; colors: any; chevron?: boolean }) {
   return (
@@ -54,12 +52,8 @@ export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useThemeStore();
   const { userModel, isAuthenticated, logout } = useAuthStore();
   const { config, creditsRemaining, creditsUsed, loadSubscription } = useSubscriptionStore();
-  const { apiKey, saveApiKey, removeApiKey } = useApiKeyStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPlansModal, setShowPlansModal] = useState(false);
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [apiKeyDraft, setApiKeyDraft] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
 
   useEffect(() => { loadSubscription(); }, []);
 
@@ -85,59 +79,15 @@ export default function ProfileScreen() {
           </FadeInView>
 
           <FadeInView delay={50}>
-            <AppCard style={[styles.infoCard, { backgroundColor: apiKey ? '#E8F5E9' : '#FFF3E0', borderColor: apiKey ? '#4CAF50' : '#FF9800' }]}>
-              <MaterialCommunityIcons name={apiKey ? 'check-circle' : 'key-variant'} size={22} color={apiKey ? '#4CAF50' : '#FF9800'} />
+            <AppCard style={[styles.infoCard, { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }]}>
+              <MaterialCommunityIcons name="check-circle" size={22} color="#4CAF50" />
               <View style={{ flex: 1, marginLeft: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: apiKey ? '#2E7D32' : '#E65100' }}>
-                  {apiKey ? 'Gemini API Connected' : 'Gemini API Key Required'}
-                </Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#2E7D32' }}>AI Extraction Ready</Text>
                 <Text style={{ fontSize: 12, color: '#555', marginTop: 2 }}>
-                  {apiKey ? 'AI extraction is ready to use.' : 'Add your Gemini API key to enable AI-powered extraction.'}
+                  Powered by Google Gemini. Just upload and extract.
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => { setShowApiKeyInput(!showApiKeyInput); setApiKeyDraft(apiKey || ''); }}>
-                <MaterialCommunityIcons name={showApiKeyInput ? 'chevron-up' : 'chevron-down'} size={20} color="#666" />
-              </TouchableOpacity>
             </AppCard>
-            {showApiKeyInput && (
-              <AppCard style={{ backgroundColor: colors.surface, borderColor: colors.cardBorder, marginTop: 8 }}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary, marginBottom: 8 }}>Google Gemini API Key</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 10, borderColor: colors.border, backgroundColor: colors.background, paddingHorizontal: 12 }}>
-                  <TextInput
-                    style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: colors.textPrimary }}
-                    placeholder="Enter your Gemini API key"
-                    placeholderTextColor={colors.textTertiary}
-                    value={apiKeyDraft}
-                    onChangeText={setApiKeyDraft}
-                    secureTextEntry={!showApiKey}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)} style={{ marginLeft: 8 }}>
-                    <MaterialCommunityIcons name={showApiKey ? 'eye-off' : 'eye'} size={20} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                  <AppButton
-                    title="Save"
-                    onPress={() => { saveApiKey(apiKeyDraft.trim()); setShowApiKeyInput(false); }}
-                    disabled={!apiKeyDraft.trim()}
-                    style={{ flex: 1 }}
-                  />
-                  {apiKey && (
-                    <AppButton
-                      title="Remove"
-                      onPress={() => { removeApiKey(); setApiKeyDraft(''); setShowApiKeyInput(false); }}
-                      variant="outline"
-                      style={{ flex: 1 }}
-                    />
-                  )}
-                </View>
-                <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 8, lineHeight: 16 }}>
-                  Get a free API key from Google AI Studio: aistudio.google.com
-                </Text>
-              </AppCard>
-            )}
           </FadeInView>
 
           <FadeInView delay={100}>
@@ -239,58 +189,6 @@ export default function ProfileScreen() {
                 />
               </View>
             </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => { setShowApiKeyInput(!showApiKeyInput); setApiKeyDraft(apiKey || ''); }}>
-              <View style={[settingStyles.row, { borderBottomColor: colors.borderLight }]}>
-                <View style={[settingStyles.iconWrap, { backgroundColor: apiKey ? '#E8F5E9' : '#FFF3E0' }]}>
-                  <MaterialCommunityIcons name={apiKey ? 'key-check' : 'key-variant'} size={18} color={apiKey ? '#4CAF50' : '#FF9800'} />
-                </View>
-                <Text style={[settingStyles.label, { color: colors.textPrimary }]}>Gemini API Key</Text>
-                <View style={settingStyles.right}>
-                  <Text style={[settingStyles.value, { color: apiKey ? '#4CAF50' : '#FF9800' }]}>{apiKey ? 'Connected' : 'Not set'}</Text>
-                  <MaterialCommunityIcons name={showApiKeyInput ? 'chevron-up' : 'chevron-right'} size={20} color={colors.textTertiary} />
-                </View>
-              </View>
-            </TouchableOpacity>
-            {showApiKeyInput && (
-              <View style={{ paddingHorizontal: 4, paddingBottom: 8 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 10, borderColor: colors.border, backgroundColor: colors.background, paddingHorizontal: 12 }}>
-                  <TextInput
-                    style={{ flex: 1, paddingVertical: 10, fontSize: 14, color: colors.textPrimary }}
-                    placeholder="Enter your Gemini API key"
-                    placeholderTextColor={colors.textTertiary}
-                    value={apiKeyDraft}
-                    onChangeText={setApiKeyDraft}
-                    secureTextEntry={!showApiKey}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                  <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)} style={{ marginLeft: 8 }}>
-                    <MaterialCommunityIcons name={showApiKey ? 'eye-off' : 'eye'} size={20} color={colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <AppButton
-                    title="Save"
-                    onPress={() => { saveApiKey(apiKeyDraft.trim()); setShowApiKeyInput(false); }}
-                    disabled={!apiKeyDraft.trim()}
-                    style={{ flex: 1 }}
-                  />
-                  {apiKey && (
-                    <AppButton
-                      title="Remove"
-                      onPress={() => { removeApiKey(); setApiKeyDraft(''); setShowApiKeyInput(false); }}
-                      variant="outline"
-                      style={{ flex: 1 }}
-                    />
-                  )}
-                </View>
-                <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 6, lineHeight: 16 }}>
-                  Get a free API key from Google AI Studio: aistudio.google.com
-                </Text>
-              </View>
-            )}
-
             <SettingRow icon="bell-outline" label="Notifications" value={notificationsEnabled ? 'On' : 'Off'} colors={colors}
               onPress={() => setNotificationsEnabled(!notificationsEnabled)} />
             <SettingRow icon="translate" label="Language" value="English" colors={colors}
