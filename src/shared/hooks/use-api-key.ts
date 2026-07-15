@@ -1,19 +1,19 @@
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_KEY_STORAGE = '@openrouter_api_key';
+const API_KEY_STORAGE = '@gemini_api_key';
 
 interface ApiKeyState {
   apiKey: string;
-  setApiKey: (key: string) => Promise<void>;
+  saveApiKey: (key: string) => Promise<void>;
   loadApiKey: () => Promise<void>;
-  clearApiKey: () => Promise<void>;
+  removeApiKey: () => Promise<void>;
 }
 
 export const useApiKeyStore = create<ApiKeyState>((set) => ({
   apiKey: '',
 
-  setApiKey: async (key: string) => {
+  saveApiKey: async (key: string) => {
     await AsyncStorage.setItem(API_KEY_STORAGE, key);
     set({ apiKey: key });
   },
@@ -25,7 +25,7 @@ export const useApiKeyStore = create<ApiKeyState>((set) => ({
     } catch {}
   },
 
-  clearApiKey: async () => {
+  removeApiKey: async () => {
     await AsyncStorage.removeItem(API_KEY_STORAGE);
     set({ apiKey: '' });
   },

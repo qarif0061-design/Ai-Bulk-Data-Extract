@@ -1,0 +1,54 @@
+import { Platform } from 'react-native';
+
+/**
+ * Reads a file URI as base64 string, working on both web and native.
+ * On web, uses fetch + arrayBuffer to handle blob:/file: URIs from document picker.
+ * On native, uses expo-file-system.
+ */
+export async function readFileAsBase64(fileUri: string): Promise<string> {
+  if (Platform.OS === 'web') {
+    return readFileAsBase64Web(fileUri);
+  }
+  const FileSystem = await import('expo-file-system');
+  return FileSystem.default.readAsStringAsync(fileUri, {
+    encoding: FileSystem.default.EncodingType.Base64,
+  });
+}
+
+async function readFileAsBase64Web(fileUri: string): Promise<string> {
+  try {
+    const response = await fetch(fileUri);
+    if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+    const blob = await response.blob();
+    return await blobToBase64(blob);
+  } catch (e: any) {
+    throw new Error(`Failed to read file as base64 on web: ${e.message}`);
+  }
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      // data URL format: data:<mime>;base64,<data>
+      const base64 = dataUrl.split(',')[1];
+      if (base64) {
+        resolve(base64);
+      } else {
+        reject(new Error('Failed to extract base64 from data URL'));
+      }
+    };
+    reader.onerror = () => reject(new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Fetches a file URI and returns it as a Blob with the correct MIME type.
+ */
+export async function readFileAsBlob(fileUri: string): Promise<Blob> {
+  const response = await fetch(fileUri);
+  if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
+  return response.blob();
+}

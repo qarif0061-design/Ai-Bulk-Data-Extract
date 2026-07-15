@@ -17,8 +17,6 @@ import { useFeedbackStore } from '../../src/shared/hooks/use-feedback';
 import { JobModel, JobStatus } from '../../src/shared/models/job-model';
 import { ExportFormat, EXPORT_FORMAT_INFO } from '../../src/core/enums/export-format';
 import { ResultMerger } from '../../src/ai/pipeline/result-merger';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 
 let Clipboard: any = null;
 if (Platform.OS !== 'web') {
@@ -119,11 +117,25 @@ export default function ResultsScreen() {
           fileName += '.csv'; mimeType = 'text/csv'; break;
       }
 
-      const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-      await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: `Export as ${EXPORT_FORMAT_INFO[fmt].label}` });
-      } else { Alert.alert('Export', `File saved to: ${fileUri}`); }
+      if (Platform.OS === 'web') {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const FileSystem = require('expo-file-system');
+        const Sharing = require('expo-sharing');
+        const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
+        await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: `Export as ${EXPORT_FORMAT_INFO[fmt].label}` });
+        } else { Alert.alert('Export', `File saved to: ${fileUri}`); }
+      }
 
       triggerFeedbackIfAllowed();
     } catch (error: any) { Alert.alert('Export Failed', error.message || 'Could not export data'); }

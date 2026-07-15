@@ -2,7 +2,7 @@ import { ExtractionMode } from '../../core/enums/extraction-mode';
 import { AiProvider } from '../abstraction/ai-provider';
 import { AiResponseImpl } from '../abstraction/ai-response';
 import { PromptBuilder } from '../prompts/prompt-builder';
-import { OcrProcessor, ProcessedFile } from './ocr-processor';
+import { OcrProcessor } from './ocr-processor';
 import { extractTextFromFile } from './local-text-extractor';
 import { extractDataLocally } from './rule-extractor';
 import { ResultMerger, MergedResult } from './result-merger';
@@ -53,13 +53,15 @@ export class ExtractionPipeline {
 
         try {
           extractedText = await extractTextFromFile(file.uri, file.name);
-        } catch (e) {
-          console.warn('Local text extraction failed for', file.name, e);
+          console.log(`[Pipeline] Local text for "${file.name}": ${extractedText.length} chars`);
+        } catch (e: any) {
+          console.warn(`[Pipeline] Local text extraction failed for "${file.name}":`, e?.message);
         }
 
         if (extractedText && extractedText.trim().length > 5) {
           const localResult = extractDataLocally(extractedText, this.mode, file.name);
           const hasData = this.checkHasData(localResult.data);
+          console.log(`[Pipeline] Rule engine for "${file.name}": hasData=${hasData}`);
           if (hasData) {
             responses.push({
               fileName: file.name,
@@ -81,6 +83,7 @@ export class ExtractionPipeline {
             }
           }
         } else {
+          console.log(`[Pipeline] No local text for "${file.name}", trying AI...`);
           const aiResponse = await this.tryAiExtraction(file);
           if (aiResponse) {
             responses.push({ fileName: file.name, response: aiResponse });
@@ -95,6 +98,7 @@ export class ExtractionPipeline {
           }
         }
       } catch (error: any) {
+        console.error(`[Pipeline] Error processing "${file.name}":`, error);
         responses.push({
           fileName: file.name,
           response: AiResponseImpl.failure(error.message || 'Extraction failed', 'local'),
@@ -110,6 +114,7 @@ export class ExtractionPipeline {
     });
 
     const merged = ResultMerger.merge(responses);
+    console.log(`[Pipeline] Merged: ${Object.keys(merged.data).length} keys, ${merged.errors.length} errors`);
 
     const totalErrors = merged.errors.length;
     this.reportProgress({
@@ -125,18 +130,29 @@ export class ExtractionPipeline {
 
   private async tryAiExtraction(file: { uri: string; name: string }): Promise<AiResponseImpl | null> {
     try {
+      console.log(`[Pipeline] OCR processing "${file.name}"...`);
       const processed = await OcrProcessor.processFile(file.uri, file.name);
+      console.log(`[Pipeline] OCR done. base64 length: ${processed.base64Data.length}, mime: ${processed.mimeType}`);
+
       const prompt = PromptBuilder.build(this.mode, file.name, this.customPrompt);
+      console.log(`[Pipeline] Sending to Gemini API...`);
+
       const response = await this.provider.sendRequest({
         systemPrompt: prompt.systemPrompt,
         userPrompt: prompt.userPrompt,
         imageBase64: processed.base64Data,
         imageMimeType: processed.mimeType,
       });
+
+      console.log(`[Pipeline] Gemini response: success=${response.success}, content length=${response.content?.length || 0}`);
+      if (response.error) console.warn(`[Pipeline] Gemini error: ${response.error}`);
+
       if (response.success && response.content) {
         return AiResponseImpl.success(response.content, response.tokensUsed, response.model);
       }
-    } catch {}
+    } catch (error: any) {
+      console.error(`[Pipeline] AI extraction failed for "${file.name}":`, error?.message);
+    }
     return null;
   }
 
