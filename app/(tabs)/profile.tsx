@@ -6,10 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  TextInput,
   Switch,
   Linking,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,11 +16,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AppCard } from '../../src/shared/components/app-card';
 import { AppButton } from '../../src/shared/components/app-button';
 import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/animated';
+import { SubscriptionPlansModal } from '../../src/shared/components/subscription-plans-modal';
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useSubscriptionStore } from '../../src/features/subscription/subscription-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
-import { useApiKeyStore } from '../../src/shared/hooks/use-api-key';
-import { SubscriptionPlansModal } from '../../src/shared/components/subscription-plans-modal';
 import { SUBSCRIPTION_CONFIGS, SubscriptionTier } from '../../src/core/enums/subscription-tier';
 
 function SettingRow({ icon, label, value, onPress, colors, chevron = true }: { icon: string; label: string; value?: string; onPress?: () => void; colors: any; chevron?: boolean }) {
@@ -54,20 +51,11 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { colors, mode, toggleTheme } = useThemeStore();
   const { userModel, isAuthenticated, logout } = useAuthStore();
-  const { config, creditsRemaining, creditsUsed, loadSubscription, getUsagePercent, getCreditsPercent } = useSubscriptionStore();
-  const { apiKey, setApiKey, loadApiKey } = useApiKeyStore();
-  const [editMode, setEditMode] = useState(false);
-  const [displayName, setDisplayName] = useState('');
-  const [bio, setBio] = useState('');
+  const { config, creditsRemaining, creditsUsed, loadSubscription } = useSubscriptionStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState('');
   const [showPlansModal, setShowPlansModal] = useState(false);
 
-  useEffect(() => { loadSubscription(); loadApiKey(); }, []);
-  useEffect(() => {
-    if (userModel) setDisplayName(userModel.displayName || '');
-  }, [userModel]);
+  useEffect(() => { loadSubscription(); }, []);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -75,8 +63,6 @@ export default function ProfileScreen() {
       { text: 'Sign Out', style: 'destructive', onPress: () => logout() },
     ]);
   };
-
-  const tiers = Object.values(SUBSCRIPTION_CONFIGS);
 
   if (!isAuthenticated) {
     return (
@@ -88,8 +74,20 @@ export default function ProfileScreen() {
                 <MaterialCommunityIcons name="account-outline" size={40} color="rgba(255,255,255,0.7)" />
               </View>
               <Text style={styles.guestName}>Guest User</Text>
-              <Text style={styles.guestSub}>Sign in to unlock all features</Text>
+              <Text style={styles.guestSub}>Sign in to unlock credits and history</Text>
             </LinearGradient>
+          </FadeInView>
+
+          <FadeInView delay={50}>
+            <AppCard style={[styles.infoCard, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
+              <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.infoTitle, { color: colors.primary }]}>No API Key Required</Text>
+                <Text style={[styles.infoSub, { color: colors.textSecondary }]}>
+                  Free extraction uses built-in OCR + pattern matching. Works offline for PDFs and printed text.
+                </Text>
+              </View>
+            </AppCard>
           </FadeInView>
 
           <FadeInView delay={100}>
@@ -108,53 +106,22 @@ export default function ProfileScreen() {
           </FadeInView>
 
           <FadeInView delay={150}>
-            <AppCard style={[styles.signInCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <MaterialCommunityIcons name="key-variant" size={32} color={colors.primary} />
-              <Text style={[styles.signInTitle, { color: colors.textPrimary }]}>API Key Required</Text>
-              <Text style={[styles.signInSub, { color: colors.textSecondary }]}>
-                Add your OpenRouter API key to enable AI extraction. Get a free key at openrouter.ai
-              </Text>
-              <TextInput
-                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
-                placeholder="sk-or-v1-..."
-                placeholderTextColor={colors.textTertiary}
-                value={tempApiKey || apiKey}
-                onChangeText={setTempApiKey}
-                secureTextEntry={!showApiKey}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={styles.apiKeyRow}>
-                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
-                  <Text style={[styles.apiKeyToggle, { color: colors.primary }]}>{showApiKey ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
-                <AppButton
-                  title="Save"
-                  size="small"
-                  onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved securely.'); }}
-                  disabled={!tempApiKey.trim()}
-                />
-              </View>
-            </AppCard>
-          </FadeInView>
-
-          <FadeInView delay={200}>
-            <AppCard style={[styles.signInCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-              <MaterialCommunityIcons name="login" size={32} color={colors.primary} />
-              <Text style={[styles.signInTitle, { color: colors.textPrimary }]}>Sign In Required</Text>
-              <Text style={[styles.signInSub, { color: colors.textSecondary }]}>
-                Create an account to track extractions, manage credits, and more.
-              </Text>
-              <AppButton title="Sign In" onPress={() => router.push('/(auth)/login')} fullWidth style={{ marginTop: 12 }} />
-            </AppCard>
-          </FadeInView>
-
-          <FadeInView delay={250}>
             <ScaleTouchableOpacity onPress={() => setShowPlansModal(true)} style={[styles.plansButton, { backgroundColor: colors.primary }]}>
               <MaterialCommunityIcons name="crown" size={22} color="#FFFFFF" />
               <Text style={styles.plansButtonText}>View Subscription Plans</Text>
               <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.7)" />
             </ScaleTouchableOpacity>
+          </FadeInView>
+
+          <FadeInView delay={200}>
+            <AppCard style={[styles.signInCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <MaterialCommunityIcons name="login" size={32} color={colors.primary} />
+              <Text style={[styles.signInTitle, { color: colors.textPrimary }]}>Sign In for More</Text>
+              <Text style={[styles.signInSub, { color: colors.textSecondary }]}>
+                Create an account to track extractions, manage credits, and access history.
+              </Text>
+              <AppButton title="Sign In" onPress={() => router.push('/(auth)/login')} fullWidth style={{ marginTop: 12 }} />
+            </AppCard>
           </FadeInView>
         </ScrollView>
 
@@ -226,30 +193,6 @@ export default function ProfileScreen() {
               onPress={() => setNotificationsEnabled(!notificationsEnabled)} />
             <SettingRow icon="translate" label="Language" value="English" colors={colors}
               onPress={() => Alert.alert('Language', 'Language settings coming soon')} />
-            <View style={{ marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
-              <Text style={[styles.cardTitle, { color: colors.textPrimary, marginBottom: 8 }]}>OpenRouter API Key</Text>
-              <TextInput
-                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
-                placeholder="sk-or-v1-..."
-                placeholderTextColor={colors.textTertiary}
-                value={tempApiKey || apiKey}
-                onChangeText={setTempApiKey}
-                secureTextEntry={!showApiKey}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={styles.apiKeyRow}>
-                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
-                  <Text style={[styles.apiKeyToggle, { color: colors.primary }]}>{showApiKey ? 'Hide' : 'Show'}</Text>
-                </TouchableOpacity>
-                <AppButton
-                  title="Save"
-                  size="small"
-                  onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved securely.'); }}
-                  disabled={!tempApiKey.trim()}
-                />
-              </View>
-            </View>
           </AppCard>
         </FadeInView>
 
@@ -265,7 +208,7 @@ export default function ProfileScreen() {
             <SettingRow icon="shield" label="Privacy Policy" colors={colors}
               onPress={() => Linking.openURL('https://example.com/privacy')} />
             <SettingRow icon="information" label="About" value="v1.0.0" colors={colors}
-              onPress={() => Alert.alert('AI Bulk Data Extractor', 'Version 1.0.0\nBuilt with Expo + React Native')} />
+              onPress={() => Alert.alert('AI Bulk Data Extractor', 'Version 1.0.0\nBuilt with Expo + React Native\n\nFree OCR extraction powered by Tesseract.js + rule-based parsing')} />
           </AppCard>
         </FadeInView>
 
@@ -317,23 +260,13 @@ const styles = StyleSheet.create({
   signInCard: { alignItems: 'center', padding: 24, marginBottom: 16 },
   signInTitle: { fontSize: 18, fontWeight: '800', marginTop: 12 },
   signInSub: { fontSize: 14, textAlign: 'center', marginTop: 8, lineHeight: 20 },
+  infoCard: { flexDirection: 'row', alignItems: 'center', padding: 16, marginBottom: 16 },
+  infoTitle: { fontSize: 14, fontWeight: '700' },
+  infoSub: { fontSize: 12, marginTop: 2, lineHeight: 16 },
   card: { padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  sectionLabel: { fontSize: 18, fontWeight: '800', marginBottom: 12 },
-  planCard: { padding: 16, marginBottom: 10 },
-  planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  planName: { fontSize: 16, fontWeight: '700' },
-  planPrice: { fontSize: 14, marginTop: 2 },
-  currentBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  currentBadgeText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
-  planFeatures: { gap: 6 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  featureText: { fontSize: 13 },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 1.5, borderRadius: 14, gap: 8, marginTop: 8 },
-  logoutText: { fontSize: 15, fontWeight: '700' },
-  apiKeyInput: { borderWidth: 1.5, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'monospace', marginTop: 8 },
-  apiKeyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
-  apiKeyToggle: { fontSize: 13, fontWeight: '600' },
   plansButton: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, gap: 10, marginBottom: 12 },
   plansButtonText: { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 1.5, borderRadius: 14, gap: 8, marginTop: 8 },
+  logoutText: { fontSize: 15, fontWeight: '700' },
 });

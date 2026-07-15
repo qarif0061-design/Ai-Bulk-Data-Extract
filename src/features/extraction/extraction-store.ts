@@ -64,12 +64,15 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
       set({ currentJobId: jobId });
 
       const apiKeyVal = useApiKeyStore.getState().apiKey;
-      const provider = AiProviderFactory.createOpenRouterProvider({
-        apiKey: apiKeyVal || '',
-        model: AI_CONFIG.defaultModel,
-        maxTokens: AI_CONFIG.maxTokens,
-        temperature: AI_CONFIG.temperature,
-      });
+      let provider = null;
+      if (apiKeyVal) {
+        provider = AiProviderFactory.createOpenRouterProvider({
+          apiKey: apiKeyVal,
+          model: AI_CONFIG.defaultModel,
+          maxTokens: AI_CONFIG.maxTokens,
+          temperature: AI_CONFIG.temperature,
+        });
+      }
 
       let mergedResult: any = { data: {}, totalTokensUsed: 0, errors: [] };
 

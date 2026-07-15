@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/shared/hooks/use-auth';
 import { useThemeStore } from '../src/shared/hooks/use-theme';
 import { useApiKeyStore } from '../src/shared/hooks/use-api-key';
+import { useFeedbackStore } from '../src/shared/hooks/use-feedback';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -14,10 +15,12 @@ export default function RootLayout() {
   const { initAuth, isLoading } = useAuthStore();
   const { mode, loadTheme } = useThemeStore();
   const { loadApiKey } = useApiKeyStore();
+  const { loadRating } = useFeedbackStore();
 
   useEffect(() => {
     loadTheme();
     loadApiKey();
+    loadRating();
     const unsubscribe = initAuth();
     return unsubscribe;
   }, []);
