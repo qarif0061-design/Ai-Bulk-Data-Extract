@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppButton } from '../../src/shared/components/app-button';
 import { AppCard } from '../../src/shared/components/app-card';
-import { LoadingOverlay } from '../../src/shared/components/loading-overlay';
+import { ProcessingOverlay } from '../../src/shared/components/processing-overlay';
 import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/animated';
 import { useUploadStore } from '../../src/features/upload/upload-store';
 import { useExtractionStore } from '../../src/features/extraction/extraction-store';
@@ -66,7 +66,7 @@ export default function UploadScreen() {
   const router = useRouter();
   const { colors } = useThemeStore();
   const { files, addFiles, removeFile, clearFiles } = useUploadStore();
-  const { isProcessing, startExtraction, error } = useExtractionStore();
+  const { isProcessing, startExtraction, error, progress } = useExtractionStore();
   const [selectedModes, setSelectedModes] = useState<ExtractionMode[]>([]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [jobTitle, setJobTitle] = useState('');
@@ -76,7 +76,7 @@ export default function UploadScreen() {
   const toggleMode = (mode: ExtractionMode) => {
     const info = EXTRACTION_MODES.find((m) => m.mode === mode);
     if (info?.standaloneOnly) {
-      setSelectedModes([mode]);
+      setSelectedModes((prev) => prev.length === 1 && prev[0] === mode ? [] : [mode]);
       return;
     }
 
@@ -340,7 +340,14 @@ export default function UploadScreen() {
           />
         </View>
 
-        <LoadingOverlay visible={isProcessing} message="Processing extraction..." />
+        <ProcessingOverlay
+          visible={isProcessing}
+          message={progress?.status === 'merging' ? 'Merging results...' : progress?.status === 'completed' ? 'Done!' : 'Extracting data...'}
+          currentFile={progress?.currentFile || ''}
+          processedFiles={progress?.processedFiles || 0}
+          totalFiles={progress?.totalFiles || 0}
+          status={progress?.status || 'processing'}
+        />
       </View>
     </SafeAreaView>
   );

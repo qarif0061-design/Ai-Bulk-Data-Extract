@@ -1,12 +1,9 @@
 import { create } from 'zustand';
 import { ExtractionMode } from '../../core/enums/extraction-mode';
 import { ExtractionPipeline, ExtractionProgress } from '../../ai/pipeline/extraction-pipeline';
-import { AiProviderFactory } from '../../ai/abstraction/ai-provider-factory';
 import { FirestoreService } from '../../shared/services/firestore-service';
 import { JobModel, JobStatus } from '../../shared/models/job-model';
 import { useAuthStore } from '../../shared/hooks/use-auth';
-import { useApiKeyStore } from '../../shared/hooks/use-api-key';
-import { AI_CONFIG } from '../../core/config/app-config';
 
 interface ExtractionState {
   isProcessing: boolean;
@@ -63,17 +60,6 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({ currentJobId: jobId });
 
-      const apiKeyVal = useApiKeyStore.getState().apiKey;
-      let provider = null;
-      if (apiKeyVal) {
-        provider = AiProviderFactory.createOpenRouterProvider({
-          apiKey: apiKeyVal,
-          model: AI_CONFIG.defaultModel,
-          maxTokens: AI_CONFIG.maxTokens,
-          temperature: AI_CONFIG.temperature,
-        });
-      }
-
       let mergedResult: any = { data: {}, totalTokensUsed: 0, errors: [] };
 
       for (const mode of modes) {
@@ -87,7 +73,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
         });
 
         const pipeline = new ExtractionPipeline(
-          provider,
+          null,
           mode,
           mode === ExtractionMode.CUSTOM ? customPrompt : undefined,
           (progress) => {
@@ -149,7 +135,8 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
           totalFiles: files.length * modes.length,
           processedFiles: files.length * modes.length,
           currentFile: '',
-          status: 'completed',
+          status: mergedResult.errors.length > 0 ? 'failed' : 'completed',
+          error: mergedResult.errors.length > 0 ? mergedResult.errors.join('\n') : undefined,
         },
       });
 
