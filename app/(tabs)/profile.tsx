@@ -17,12 +17,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppCard } from '../../src/shared/components/app-card';
 import { AppButton } from '../../src/shared/components/app-button';
-import { FadeInView } from '../../src/shared/components/animated';
+import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/animated';
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useSubscriptionStore } from '../../src/features/subscription/subscription-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
 import { useApiKeyStore } from '../../src/shared/hooks/use-api-key';
-import { SUBSCRIPTION_CONFIGS } from '../../src/core/enums/subscription-tier';
+import { SubscriptionPlansModal } from '../../src/shared/components/subscription-plans-modal';
+import { SUBSCRIPTION_CONFIGS, SubscriptionTier } from '../../src/core/enums/subscription-tier';
 
 function SettingRow({ icon, label, value, onPress, colors, chevron = true }: { icon: string; label: string; value?: string; onPress?: () => void; colors: any; chevron?: boolean }) {
   return (
@@ -61,6 +62,7 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showApiKey, setShowApiKey] = useState(false);
   const [tempApiKey, setTempApiKey] = useState('');
+  const [showPlansModal, setShowPlansModal] = useState(false);
 
   useEffect(() => { loadSubscription(); loadApiKey(); }, []);
   useEffect(() => {
@@ -148,27 +150,15 @@ export default function ProfileScreen() {
           </FadeInView>
 
           <FadeInView delay={250}>
-            <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Subscription Plans</Text>
-            {tiers.map((tierConfig) => (
-              <AppCard key={tierConfig.tier} style={[styles.planCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={[styles.planName, { color: colors.textPrimary }]}>{tierConfig.label}</Text>
-                    <Text style={[styles.planPrice, { color: colors.textSecondary }]}>{tierConfig.price === 0 ? 'Free' : `$${tierConfig.price}/mo`}</Text>
-                  </View>
-                </View>
-                <View style={styles.planFeatures}>
-                  {tierConfig.features.map((feature, idx) => (
-                    <View key={idx} style={styles.featureRow}>
-                      <MaterialCommunityIcons name="check-circle" size={14} color={colors.textTertiary} />
-                      <Text style={[styles.featureText, { color: colors.textSecondary }]}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-              </AppCard>
-            ))}
+            <ScaleTouchableOpacity onPress={() => setShowPlansModal(true)} style={[styles.plansButton, { backgroundColor: colors.primary }]}>
+              <MaterialCommunityIcons name="crown" size={22} color="#FFFFFF" />
+              <Text style={styles.plansButtonText}>View Subscription Plans</Text>
+              <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.7)" />
+            </ScaleTouchableOpacity>
           </FadeInView>
         </ScrollView>
+
+        <SubscriptionPlansModal visible={showPlansModal} onClose={() => setShowPlansModal(false)} currentTier={SubscriptionTier.FREE} />
       </SafeAreaView>
     );
   }
@@ -280,36 +270,11 @@ export default function ProfileScreen() {
         </FadeInView>
 
         <FadeInView delay={250}>
-          <Text style={[styles.sectionLabel, { color: colors.textPrimary }]}>Subscription Plans</Text>
-          {tiers.map((tierConfig) => {
-            const isActive = tierConfig.tier === config.tier;
-            return (
-              <AppCard key={tierConfig.tier} style={[styles.planCard, { backgroundColor: colors.surface, borderColor: isActive ? colors.primary : colors.cardBorder, borderWidth: isActive ? 2 : 1 }]}>
-                <View style={styles.planHeader}>
-                  <View>
-                    <Text style={[styles.planName, { color: colors.textPrimary }]}>{tierConfig.label}</Text>
-                    <Text style={[styles.planPrice, { color: colors.textSecondary }]}>{tierConfig.price === 0 ? 'Free' : `$${tierConfig.price}/mo`}</Text>
-                  </View>
-                  {isActive && (
-                    <View style={[styles.currentBadge, { backgroundColor: colors.primary }]}>
-                      <Text style={styles.currentBadgeText}>Current</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.planFeatures}>
-                  {tierConfig.features.map((feature, idx) => (
-                    <View key={idx} style={styles.featureRow}>
-                      <MaterialCommunityIcons name="check-circle" size={14} color={isActive ? colors.primary : colors.textTertiary} />
-                      <Text style={[styles.featureText, { color: isActive ? colors.textPrimary : colors.textSecondary }]}>{feature}</Text>
-                    </View>
-                  ))}
-                </View>
-                {!isActive && tierConfig.price > 0 && (
-                  <AppButton title={`Upgrade to ${tierConfig.label}`} variant={tierConfig.tier === 'pro' ? 'primary' : 'outline'} size="small" fullWidth onPress={() => Alert.alert('Coming Soon', 'Subscription upgrade coming soon.')} />
-                )}
-              </AppCard>
-            );
-          })}
+          <ScaleTouchableOpacity onPress={() => setShowPlansModal(true)} style={[styles.plansButton, { backgroundColor: colors.primary }]}>
+            <MaterialCommunityIcons name="crown" size={22} color="#FFFFFF" />
+            <Text style={styles.plansButtonText}>View Subscription Plans</Text>
+            <MaterialCommunityIcons name="chevron-right" size={22} color="rgba(255,255,255,0.7)" />
+          </ScaleTouchableOpacity>
         </FadeInView>
 
         <FadeInView delay={300}>
@@ -323,6 +288,8 @@ export default function ProfileScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      <SubscriptionPlansModal visible={showPlansModal} onClose={() => setShowPlansModal(false)} currentTier={config.tier} />
     </SafeAreaView>
   );
 }
@@ -367,4 +334,6 @@ const styles = StyleSheet.create({
   apiKeyInput: { borderWidth: 1.5, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'monospace', marginTop: 8 },
   apiKeyRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 },
   apiKeyToggle: { fontSize: 13, fontWeight: '600' },
+  plansButton: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, gap: 10, marginBottom: 12 },
+  plansButtonText: { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
 });

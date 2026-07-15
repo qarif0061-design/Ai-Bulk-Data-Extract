@@ -17,10 +17,9 @@ interface ExtractionState {
   lastJobId: string | null;
   startExtraction: (
     files: { uri: string; name: string }[],
-    mode: ExtractionMode,
+    modes: ExtractionMode[],
     jobTitle: string,
-    customPrompt?: string,
-    apiKey?: string
+    customPrompt?: string
   ) => Promise<string>;
   reset: () => void;
   setError: (error: string | null) => void;
@@ -34,7 +33,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
   error: null,
   lastJobId: null,
 
-  startExtraction: async (files, mode, jobTitle, customPrompt, apiKey) => {
+  startExtraction: async (files, modes, jobTitle, customPrompt) => {
     try {
       set({ isProcessing: true, error: null, progress: null });
 
@@ -50,7 +49,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
           userId: user!.uid,
           title: jobTitle,
           status: JobStatus.PROCESSING,
-          extractionMode: mode,
+          extractionMode: modes[0],
           files: files.map((f) => ({ name: f.name, uri: f.uri })),
           fileCount: files.length,
           createdAt: new Date(),
@@ -64,43 +63,75 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({ currentJobId: jobId });
 
-      const apiKey = useApiKeyStore.getState().apiKey;
+      const apiKeyVal = useApiKeyStore.getState().apiKey;
       const provider = AiProviderFactory.createOpenRouterProvider({
-        apiKey: apiKey || '',
+        apiKey: apiKeyVal || '',
         model: AI_CONFIG.defaultModel,
         maxTokens: AI_CONFIG.maxTokens,
         temperature: AI_CONFIG.temperature,
       });
 
-      const pipeline = new ExtractionPipeline(
-        provider,
-        mode,
-        customPrompt,
-        (progress) => set({ progress })
-      );
+      let mergedResult: any = { data: {}, totalTokensUsed: 0, errors: [] };
 
-      const result = await pipeline.processFiles(files);
+      for (const mode of modes) {
+        set({
+          progress: {
+            totalFiles: files.length * modes.length,
+            processedFiles: 0,
+            currentFile: '',
+            status: 'processing',
+          },
+        });
+
+        const pipeline = new ExtractionPipeline(
+          provider,
+          mode,
+          mode === ExtractionMode.CUSTOM ? customPrompt : undefined,
+          (progress) => {
+            const modeIndex = modes.indexOf(mode);
+            set({
+              progress: {
+                ...progress,
+                totalFiles: files.length * modes.length,
+                processedFiles: modeIndex * files.length + progress.processedFiles,
+              },
+            });
+          }
+        );
+
+        const modeResult = await pipeline.processFiles(files);
+
+        for (const [key, value] of Object.entries(modeResult.data)) {
+          if (!mergedResult.data[key]) {
+            mergedResult.data[key] = value;
+          } else if (Array.isArray(mergedResult.data[key]) && Array.isArray(value)) {
+            mergedResult.data[key] = [...mergedResult.data[key], ...value];
+          }
+        }
+        mergedResult.totalTokensUsed += modeResult.totalTokensUsed;
+        mergedResult.errors.push(...modeResult.errors);
+      }
 
       if (isAuthenticated) {
-        const totalCredits = files.length;
+        const totalCredits = files.length * modes.length;
         await FirestoreService.saveExtractedData(
           jobId,
           user!.uid,
-          result.data,
+          mergedResult.data,
           'merged',
           0,
-          result.totalTokensUsed,
-          JSON.stringify(result.data)
+          mergedResult.totalTokensUsed,
+          JSON.stringify(mergedResult.data)
         );
 
         await FirestoreService.updateJob(jobId, {
-          status: result.errors.length === files.length ? JobStatus.FAILED : JobStatus.COMPLETED,
-          resultCount: Object.values(result.data).reduce((acc: number, val) => {
+          status: mergedResult.errors.length > 0 ? JobStatus.FAILED : JobStatus.COMPLETED,
+          resultCount: Object.values(mergedResult.data).reduce((acc: number, val) => {
             return acc + (Array.isArray(val) ? val.length : 0);
           }, 0),
           totalCreditsUsed: totalCredits,
           completedAt: new Date(),
-          errorMessage: result.errors.length > 0 ? result.errors.join('\n') : undefined,
+          errorMessage: mergedResult.errors.length > 0 ? mergedResult.errors.join('\n') : undefined,
         });
 
         await FirestoreService.useCredits(user!.uid, totalCredits);
@@ -109,11 +140,11 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({
         isProcessing: false,
-        result: result.data,
+        result: mergedResult.data,
         lastJobId: jobId,
         progress: {
-          totalFiles: files.length,
-          processedFiles: files.length,
+          totalFiles: files.length * modes.length,
+          processedFiles: files.length * modes.length,
           currentFile: '',
           status: 'completed',
         },

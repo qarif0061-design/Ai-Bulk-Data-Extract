@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,6 @@ import {
   Alert,
   TextInput,
   Image,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,13 +17,11 @@ import { AppButton } from '../../src/shared/components/app-button';
 import { AppCard } from '../../src/shared/components/app-card';
 import { LoadingOverlay } from '../../src/shared/components/loading-overlay';
 import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/animated';
-import { FeedbackModal } from '../../src/shared/components/feedback-modal';
 import { useUploadStore } from '../../src/features/upload/upload-store';
 import { useExtractionStore } from '../../src/features/extraction/extraction-store';
 import { ExtractionMode, EXTRACTION_MODES } from '../../src/core/enums/extraction-mode';
 import { formatFileSize, getFileExtension } from '../../src/core/utils/file-utils';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
-import { useRouter as useExpoRouter } from 'expo-router';
 
 function isImageFile(name: string): boolean {
   const ext = getFileExtension(name);
@@ -69,56 +66,67 @@ export default function UploadScreen() {
   const router = useRouter();
   const { colors } = useThemeStore();
   const { files, addFiles, removeFile, clearFiles } = useUploadStore();
-  const { isProcessing, startExtraction, error, result } = useExtractionStore();
-  const [selectedMode, setSelectedMode] = useState<ExtractionMode | null>(null);
+  const { isProcessing, startExtraction, error } = useExtractionStore();
+  const [selectedModes, setSelectedModes] = useState<ExtractionMode[]>([]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [jobTitle, setJobTitle] = useState('');
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [lastJobId, setLastJobId] = useState<string | null>(null);
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+
+  const toggleMode = (mode: ExtractionMode) => {
+    const info = EXTRACTION_MODES.find((m) => m.mode === mode);
+    if (info?.standaloneOnly) {
+      setSelectedModes([mode]);
+      return;
+    }
+
+    setSelectedModes((prev) => {
+      if (prev.includes(mode)) {
+        return prev.filter((m) => m !== mode);
+      }
+
+      const hasStandalone = prev.some((m) => {
+        const i = EXTRACTION_MODES.find((em) => em.mode === m);
+        return i?.standaloneOnly;
+      });
+      if (hasStandalone) return [mode];
+
+      return [...prev, mode];
+    });
+  };
 
   const handleExtract = async () => {
     if (files.length === 0) {
       Alert.alert('No Files', 'Please add files to extract data from.');
       return;
     }
-    if (!selectedMode) {
-      Alert.alert('Select Mode', 'Please select an extraction mode.');
+    if (selectedModes.length === 0) {
+      Alert.alert('Select Mode', 'Please select at least one extraction mode.');
       return;
     }
-    if (selectedMode === ExtractionMode.CUSTOM && !customPrompt.trim()) {
+    if (selectedModes.includes(ExtractionMode.CUSTOM) && !customPrompt.trim()) {
       Alert.alert('Custom Prompt', 'Please enter a custom extraction prompt.');
       return;
     }
 
     try {
-      const title = jobTitle.trim() || `${selectedMode} extraction - ${new Date().toLocaleDateString()}`;
+      const title = jobTitle.trim() || `${selectedModes.length > 1 ? 'Multi-extract' : selectedModes[0]} - ${new Date().toLocaleDateString()}`;
       const jobId = await startExtraction(
         files.map((f) => ({ uri: f.uri, name: f.name })),
-        selectedMode,
+        selectedModes,
         title,
-        selectedMode === ExtractionMode.CUSTOM ? customPrompt : undefined
+        selectedModes.includes(ExtractionMode.CUSTOM) ? customPrompt : undefined
       );
-      clearFiles();
-      setSelectedMode(null);
       setJobTitle('');
       setCustomPrompt('');
-      setLastJobId(jobId);
-      setShowFeedback(true);
+      router.push(`/results/${jobId}`);
     } catch (err: any) {
       Alert.alert('Extraction Failed', err.message || 'Please try again.');
     }
   };
 
-  const handleFeedbackClose = () => {
-    setShowFeedback(false);
-    if (lastJobId) {
-      router.push(`/results/${lastJobId}`);
-    }
-  };
-
-  const selectedModeInfo = EXTRACTION_MODES.find((m) => m.mode === selectedMode);
+  const modeGridItems = EXTRACTION_MODES.filter((m) => m.mode !== ExtractionMode.EXTRACT_ALL);
+  const extractAllInfo = EXTRACTION_MODES.find((m) => m.mode === ExtractionMode.EXTRACT_ALL);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
@@ -141,9 +149,11 @@ export default function UploadScreen() {
               <View style={[styles.uploadIconContainer, { backgroundColor: colors.surface }]}>
                 <MaterialCommunityIcons name="cloud-upload-outline" size={36} color={colors.primary} />
               </View>
-              <Text style={[styles.uploadTitle, { color: colors.textPrimary }]}>Tap to add files</Text>
+              <Text style={[styles.uploadTitle, { color: colors.textPrimary }]}>
+                {files.length > 0 ? 'Add More Files' : 'Tap to add files'}
+              </Text>
               <Text style={[styles.uploadSubtitle, { color: colors.textSecondary }]}>
-                PDF, PNG, JPEG, WEBP, TIFF{'\n'}Max 10 files, 20MB each
+                PDF, PNG, JPEG, WEBP, TIFF{'\n'}Pick multiple at once · Max 10 files, 20MB each
               </Text>
             </ScaleTouchableOpacity>
           </FadeInView>
@@ -155,7 +165,10 @@ export default function UploadScreen() {
                   <Text style={[styles.fileListTitle, { color: colors.textPrimary }]}>
                     {files.length} file{files.length > 1 ? 's' : ''} ({formatFileSize(totalSize)})
                   </Text>
-                  <TouchableOpacity onPress={clearFiles}>
+                  <TouchableOpacity onPress={() => Alert.alert('Clear All', 'Remove all files?', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Clear', style: 'destructive', onPress: clearFiles },
+                  ])}>
                     <Text style={[styles.clearAll, { color: colors.error }]}>Clear All</Text>
                   </TouchableOpacity>
                 </View>
@@ -186,36 +199,88 @@ export default function UploadScreen() {
 
           <FadeInView delay={350}>
             <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Extraction Mode</Text>
-            <View style={styles.modeGrid}>
-              {EXTRACTION_MODES.map((modeInfo) => (
-                <ScaleTouchableOpacity
-                  key={modeInfo.mode}
-                  onPress={() => setSelectedMode(modeInfo.mode)}
-                  style={[
-                    styles.modeCard,
-                    {
-                      backgroundColor: selectedMode === modeInfo.mode ? colors.primaryLight : colors.surface,
-                      borderColor: selectedMode === modeInfo.mode ? colors.primary : colors.cardBorder,
-                    },
-                  ]}
-                >
-                  <MaterialCommunityIcons
-                    name={modeInfo.icon as any}
-                    size={22}
-                    color={selectedMode === modeInfo.mode ? colors.primary : colors.textSecondary}
-                  />
+
+            {extractAllInfo && (
+              <ScaleTouchableOpacity
+                onPress={() => toggleMode(ExtractionMode.EXTRACT_ALL)}
+                style={[
+                  styles.extractAllCard,
+                  {
+                    backgroundColor: selectedModes.includes(ExtractionMode.EXTRACT_ALL) ? colors.primary : colors.surface,
+                    borderColor: selectedModes.includes(ExtractionMode.EXTRACT_ALL) ? colors.primary : colors.cardBorder,
+                  },
+                ]}
+              >
+                <MaterialCommunityIcons
+                  name={extractAllInfo.icon as any}
+                  size={24}
+                  color={selectedModes.includes(ExtractionMode.EXTRACT_ALL) ? '#FFFFFF' : colors.primary}
+                />
+                <View style={styles.extractAllText}>
                   <Text style={[
-                    styles.modeLabel,
-                    { color: selectedMode === modeInfo.mode ? colors.primary : colors.textSecondary },
+                    styles.extractAllLabel,
+                    { color: selectedModes.includes(ExtractionMode.EXTRACT_ALL) ? '#FFFFFF' : colors.textPrimary },
                   ]}>
-                    {modeInfo.label}
+                    {extractAllInfo.label}
                   </Text>
-                </ScaleTouchableOpacity>
-              ))}
+                  <Text style={[
+                    styles.extractAllDesc,
+                    { color: selectedModes.includes(ExtractionMode.EXTRACT_ALL) ? 'rgba(255,255,255,0.85)' : colors.textSecondary },
+                  ]}>
+                    {extractAllInfo.description}
+                  </Text>
+                </View>
+                {selectedModes.includes(ExtractionMode.EXTRACT_ALL) && (
+                  <MaterialCommunityIcons name="check-circle" size={22} color="#FFFFFF" />
+                )}
+              </ScaleTouchableOpacity>
+            )}
+
+            <Text style={[styles.multiHint, { color: colors.textTertiary }]}>
+              Or select multiple specific modes below (tap to toggle):
+            </Text>
+
+            <View style={styles.modeGrid}>
+              {modeGridItems.map((modeInfo) => {
+                const isSelected = selectedModes.includes(modeInfo.mode);
+                const isDisabled = !isSelected && selectedModes.includes(ExtractionMode.EXTRACT_ALL);
+                return (
+                  <ScaleTouchableOpacity
+                    key={modeInfo.mode}
+                    onPress={() => toggleMode(modeInfo.mode)}
+                    disabled={isDisabled}
+                    style={[
+                      styles.modeCard,
+                      {
+                        backgroundColor: isSelected ? colors.primaryLight : colors.surface,
+                        borderColor: isSelected ? colors.primary : colors.cardBorder,
+                        opacity: isDisabled ? 0.4 : 1,
+                      },
+                    ]}
+                  >
+                    <MaterialCommunityIcons
+                      name={modeInfo.icon as any}
+                      size={22}
+                      color={isSelected ? colors.primary : colors.textSecondary}
+                    />
+                    <Text style={[
+                      styles.modeLabel,
+                      { color: isSelected ? colors.primary : colors.textSecondary },
+                    ]}>
+                      {modeInfo.label}
+                    </Text>
+                    {isSelected && (
+                      <View style={[styles.modeCheck, { backgroundColor: colors.primary }]}>
+                        <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </ScaleTouchableOpacity>
+                );
+              })}
             </View>
           </FadeInView>
 
-          {selectedMode === ExtractionMode.CUSTOM && (
+          {selectedModes.includes(ExtractionMode.CUSTOM) && (
             <FadeInView delay={0}>
               <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>Custom Prompt</Text>
               <TextInput
@@ -231,18 +296,27 @@ export default function UploadScreen() {
             </FadeInView>
           )}
 
-          {selectedModeInfo && files.length > 0 && (
+          {selectedModes.length > 0 && files.length > 0 && (
             <FadeInView delay={0}>
               <AppCard style={[styles.modeInfoCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
-                <View style={styles.modeInfoRow}>
-                  <MaterialCommunityIcons name={selectedModeInfo.icon as any} size={24} color={colors.primary} />
-                  <View style={styles.modeInfoText}>
-                    <Text style={[styles.modeInfoLabel, { color: colors.textPrimary }]}>{selectedModeInfo.label}</Text>
-                    <Text style={[styles.modeInfoDesc, { color: colors.textSecondary }]}>{selectedModeInfo.description}</Text>
-                  </View>
+                <View style={styles.selectedModesRow}>
+                  <MaterialCommunityIcons name="check-multiple" size={20} color={colors.primary} />
+                  <Text style={[styles.selectedModesText, { color: colors.textPrimary }]}>
+                    {selectedModes.length} mode{selectedModes.length > 1 ? 's' : ''} selected
+                  </Text>
+                </View>
+                <View style={styles.selectedModesTags}>
+                  {selectedModes.map((m) => {
+                    const info = EXTRACTION_MODES.find((em) => em.mode === m);
+                    return (
+                      <View key={m} style={[styles.modeTag, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
+                        <Text style={[styles.modeTagText, { color: colors.primary }]}>{info?.label}</Text>
+                      </View>
+                    );
+                  })}
                 </View>
                 <Text style={[styles.costInfo, { color: colors.textSecondary, borderTopColor: colors.borderLight }]}>
-                  Processing {files.length} file{files.length > 1 ? 's' : ''}
+                  Processing {files.length} file{files.length > 1 ? 's' : ''} × {selectedModes.length} mode{selectedModes.length > 1 ? 's' : ''}
                 </Text>
               </AppCard>
             </FadeInView>
@@ -258,16 +332,15 @@ export default function UploadScreen() {
 
         <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.borderLight }]}>
           <AppButton
-            title={`Extract Data${files.length > 0 && selectedMode ? ` (${files.length})` : ''}`}
+            title={`Extract Data${files.length > 0 && selectedModes.length > 0 ? ` (${files.length}×${selectedModes.length})` : ''}`}
             onPress={handleExtract}
-            disabled={files.length === 0 || !selectedMode}
+            disabled={files.length === 0 || selectedModes.length === 0}
             loading={isProcessing}
             fullWidth
           />
         </View>
 
         <LoadingOverlay visible={isProcessing} message="Processing extraction..." />
-        <FeedbackModal visible={showFeedback} onClose={handleFeedbackClose} onSubmit={() => handleFeedbackClose()} />
       </View>
     </SafeAreaView>
   );
@@ -306,6 +379,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginBottom: 20,
   },
+  extractAllCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  extractAllText: { flex: 1, marginLeft: 12 },
+  extractAllLabel: { fontSize: 16, fontWeight: '700' },
+  extractAllDesc: { fontSize: 12, marginTop: 2 },
+  multiHint: { fontSize: 12, marginBottom: 10, fontStyle: 'italic' },
   modeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
   modeCard: {
     width: '31%',
@@ -313,8 +398,19 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 14,
     padding: 14,
+    position: 'relative',
   },
   modeLabel: { fontSize: 11, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+  modeCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   customPromptInput: {
     borderWidth: 1.5,
     borderRadius: 14,
@@ -325,10 +421,11 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   modeInfoCard: { padding: 16, marginBottom: 16 },
-  modeInfoRow: { flexDirection: 'row', alignItems: 'center' },
-  modeInfoText: { marginLeft: 12, flex: 1 },
-  modeInfoLabel: { fontSize: 15, fontWeight: '700' },
-  modeInfoDesc: { fontSize: 13, marginTop: 2 },
+  selectedModesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  selectedModesText: { fontSize: 14, fontWeight: '700' },
+  selectedModesTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  modeTag: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  modeTagText: { fontSize: 12, fontWeight: '600' },
   costInfo: { fontSize: 13, marginTop: 8, paddingTop: 8, borderTopWidth: 1 },
   errorContainer: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 16 },
   errorText: { fontSize: 13, marginLeft: 8, flex: 1 },

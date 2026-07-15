@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,16 +8,22 @@ import { AppButton } from '../../src/shared/components/app-button';
 import { EmptyState } from '../../src/shared/components/empty-state';
 import { LoadingOverlay } from '../../src/shared/components/loading-overlay';
 import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/animated';
+import { FeedbackModal } from '../../src/shared/components/feedback-modal';
 import { FirestoreService } from '../../src/shared/services/firestore-service';
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useExtractionStore } from '../../src/features/extraction/extraction-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
+import { useFeedbackStore } from '../../src/shared/hooks/use-feedback';
 import { JobModel, JobStatus } from '../../src/shared/models/job-model';
 import { ExportFormat, EXPORT_FORMAT_INFO } from '../../src/core/enums/export-format';
 import { ResultMerger } from '../../src/ai/pipeline/result-merger';
-import { format } from 'date-fns';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+
+let Clipboard: any = null;
+if (Platform.OS !== 'web') {
+  try { Clipboard = require('expo-clipboard'); } catch {}
+}
 
 export default function ResultsScreen() {
   const { jobId } = useLocalSearchParams<{ jobId: string }>();
@@ -25,12 +31,15 @@ export default function ResultsScreen() {
   const { colors } = useThemeStore();
   const { user } = useAuthStore();
   const extractionResult = useExtractionStore((s) => s.result);
+  const { hasRated, loadRating, markRated } = useFeedbackStore();
   const [job, setJob] = useState<JobModel | null>(null);
   const [extractedData, setExtractedData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'data' | 'raw'>('data');
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { loadResults(); }, [jobId]);
+  useEffect(() => { loadResults(); loadRating(); }, [jobId]);
 
   const loadResults = async () => {
     if (!jobId) return;
@@ -62,6 +71,32 @@ export default function ResultsScreen() {
     return { headers, rows };
   };
 
+  const triggerFeedbackIfAllowed = useCallback(() => {
+    if (!hasRated) {
+      setShowFeedback(true);
+    }
+  }, [hasRated]);
+
+  const handleCopyText = useCallback(async () => {
+    if (!extractedData) return;
+    const text = JSON.stringify(extractedData, null, 2);
+    try {
+      if (Clipboard) {
+        await Clipboard.setStringAsync(text);
+      } else if (navigator?.clipboard) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        Alert.alert('Copy', 'Clipboard not available on this platform');
+        return;
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      triggerFeedbackIfAllowed();
+    } catch (error: any) {
+      Alert.alert('Copy Failed', error.message || 'Could not copy to clipboard');
+    }
+  }, [extractedData, hasRated, triggerFeedbackIfAllowed]);
+
   const handleExport = async (fmt: ExportFormat) => {
     if (!extractedData || !job) return;
     try {
@@ -89,7 +124,18 @@ export default function ResultsScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: `Export as ${EXPORT_FORMAT_INFO[fmt].label}` });
       } else { Alert.alert('Export', `File saved to: ${fileUri}`); }
+
+      triggerFeedbackIfAllowed();
     } catch (error: any) { Alert.alert('Export Failed', error.message || 'Could not export data'); }
+  };
+
+  const handleFeedbackClose = () => {
+    setShowFeedback(false);
+  };
+
+  const handleFeedbackSubmit = async () => {
+    await markRated();
+    setShowFeedback(false);
   };
 
   const { headers, rows } = getTableData();
@@ -171,7 +217,10 @@ export default function ResultsScreen() {
       </ScrollView>
 
       <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.borderLight }]}>
-        <Text style={[styles.exportLabel, { color: colors.textSecondary }]}>Export as:</Text>
+        <ScaleTouchableOpacity onPress={handleCopyText} style={[styles.copyBtn, { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}>
+          <MaterialCommunityIcons name={copied ? 'check' : 'content-copy'} size={18} color={colors.primary} />
+          <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Copied!' : 'Copy All'}</Text>
+        </ScaleTouchableOpacity>
         <View style={styles.exportButtons}>
           {(Object.values(ExportFormat)).map((fmt) => (
             <ScaleTouchableOpacity key={fmt} onPress={() => handleExport(fmt)} style={[styles.exportBtn, { borderColor: colors.primary }]}>
@@ -181,6 +230,8 @@ export default function ResultsScreen() {
           ))}
         </View>
       </View>
+
+      <FeedbackModal visible={showFeedback} onClose={handleFeedbackClose} onSubmit={handleFeedbackSubmit} />
     </SafeAreaView>
   );
 }
@@ -188,7 +239,7 @@ export default function ResultsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1 },
-  content: { padding: 16, paddingBottom: 100 },
+  content: { padding: 16, paddingBottom: 120 },
   jobCard: { padding: 16, marginBottom: 16 },
   jobHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   jobTitle: { fontSize: 18, fontWeight: '800' },
@@ -209,9 +260,10 @@ const styles = StyleSheet.create({
   noDataText: { fontSize: 14 },
   rawCard: { padding: 16, marginBottom: 16 },
   rawJson: { fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', lineHeight: 18 },
-  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: 24, borderTopWidth: 1 },
-  exportLabel: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
-  exportButtons: { flexDirection: 'row', gap: 10 },
-  exportBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderRadius: 12, paddingVertical: 12 },
-  exportBtnText: { fontSize: 13, fontWeight: '700' },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16, paddingBottom: 24, borderTopWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1.5, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16 },
+  copyBtnText: { fontSize: 13, fontWeight: '700' },
+  exportButtons: { flex: 1, flexDirection: 'row', gap: 8 },
+  exportBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderWidth: 1.5, borderRadius: 12, paddingVertical: 12 },
+  exportBtnText: { fontSize: 11, fontWeight: '700' },
 });

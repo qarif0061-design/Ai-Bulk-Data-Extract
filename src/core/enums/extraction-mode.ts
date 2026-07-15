@@ -1,4 +1,5 @@
 export enum ExtractionMode {
+  EXTRACT_ALL = 'extract_all',
   TABLES = 'tables',
   EMAILS = 'emails',
   PHONE_NUMBERS = 'phone_numbers',
@@ -19,15 +20,25 @@ export interface ExtractionModeInfo {
   description: string;
   icon: string;
   creditCost: number;
+  standaloneOnly?: boolean;
 }
 
 export const EXTRACTION_MODES: ExtractionModeInfo[] = [
+  {
+    mode: ExtractionMode.EXTRACT_ALL,
+    label: 'Extract All',
+    description: 'Extract every piece of data in a beautiful readable format',
+    icon: 'select-all',
+    creditCost: 3,
+    standaloneOnly: true,
+  },
   {
     mode: ExtractionMode.TABLES,
     label: 'Tables',
     description: 'Extract tabular data with headers and rows',
     icon: 'table-large',
     creditCost: 1,
+    standaloneOnly: true,
   },
   {
     mode: ExtractionMode.EMAILS,
@@ -70,6 +81,7 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     description: 'Extract line items from invoices',
     icon: 'file-document-outline',
     creditCost: 2,
+    standaloneOnly: true,
   },
   {
     mode: ExtractionMode.DATES,
@@ -84,6 +96,7 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     description: 'Extract bank statement transaction data',
     icon: 'bank-outline',
     creditCost: 2,
+    standaloneOnly: true,
   },
   {
     mode: ExtractionMode.CONTACTS,
@@ -94,7 +107,7 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
   },
   {
     mode: ExtractionMode.COMPANY_NAMES,
-    label: 'Company Names',
+    label: 'Companies',
     description: 'Identify company and business names',
     icon: 'office-building-outline',
     creditCost: 1,
@@ -105,6 +118,7 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     description: 'Provide your own extraction prompt',
     icon: 'code-braces',
     creditCost: 2,
+    standaloneOnly: true,
   },
 ];
 
