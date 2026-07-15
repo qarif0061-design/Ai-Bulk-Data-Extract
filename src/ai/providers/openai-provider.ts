@@ -10,19 +10,27 @@ export interface VisionContent {
 export class OpenRouterProvider implements AiProvider {
   name = 'openrouter';
   private config: AiProviderConfig;
+  private baseUrl: string;
 
   constructor(config: AiProviderConfig) {
     this.config = {
-      baseUrl: AI_CONFIG.baseUrl,
       model: AI_CONFIG.defaultModel,
       maxTokens: AI_CONFIG.maxTokens,
       temperature: AI_CONFIG.temperature,
       ...config,
     };
+
+    if (config.apiKey?.startsWith('sk-or-')) {
+      this.baseUrl = 'https://openrouter.ai/api/v1';
+    } else if (config.apiKey?.startsWith('sk-')) {
+      this.baseUrl = 'https://api.openai.com/v1';
+    } else {
+      this.baseUrl = AI_CONFIG.baseUrl;
+    }
   }
 
   async sendRequest(request: AiRequest): Promise<AiResponse> {
-    const url = `${this.config.baseUrl}/chat/completions`;
+    const url = `${this.baseUrl}/chat/completions`;
 
     const messages: any[] = [
       { role: 'system', content: request.systemPrompt },
@@ -45,8 +53,8 @@ export class OpenRouterProvider implements AiProvider {
       messages.push({ role: 'user', content: request.userPrompt });
     }
 
-    const body = {
-      model: this.config.model,
+    const body: any = {
+      model: this.baseUrl.includes('openai.com') ? 'gpt-4o-mini' : (this.config.model || 'openai/gpt-4o-mini'),
       messages,
       max_tokens: request.maxTokens || this.config.maxTokens,
       temperature: request.temperature ?? this.config.temperature,
@@ -55,12 +63,12 @@ export class OpenRouterProvider implements AiProvider {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'HTTP-Referer': AI_CONFIG.appUrl,
-        'X-Title': AI_CONFIG.appTitle,
+        'Authorization': `Bearer ${this.config.apiKey}`,
       };
 
-      if (this.config.apiKey) {
-        headers['Authorization'] = `Bearer ${this.config.apiKey}`;
+      if (this.baseUrl.includes('openrouter.ai')) {
+        headers['HTTP-Referer'] = AI_CONFIG.appUrl;
+        headers['X-Title'] = AI_CONFIG.appTitle;
       }
 
       const response = await fetch(url, {
@@ -75,7 +83,7 @@ export class OpenRouterProvider implements AiProvider {
         return {
           content: '',
           tokensUsed: 0,
-          model: this.config.model || '',
+          model: body.model,
           success: false,
           error: errorMessage,
         };
@@ -89,14 +97,14 @@ export class OpenRouterProvider implements AiProvider {
       return {
         content,
         tokensUsed,
-        model: data.model || this.config.model || '',
+        model: data.model || body.model,
         success: true,
       };
     } catch (error: any) {
       return {
         content: '',
         tokensUsed: 0,
-        model: this.config.model || '',
+        model: body.model,
         success: false,
         error: error?.message || 'Network error. Please check your connection.',
       };

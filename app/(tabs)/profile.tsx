@@ -8,6 +8,7 @@ import {
   Alert,
   Switch,
   Linking,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { SubscriptionPlansModal } from '../../src/shared/components/subscription
 import { useAuthStore } from '../../src/shared/hooks/use-auth';
 import { useSubscriptionStore } from '../../src/features/subscription/subscription-store';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
+import { useApiKeyStore } from '../../src/shared/hooks/use-api-key';
 import { SUBSCRIPTION_CONFIGS, SubscriptionTier } from '../../src/core/enums/subscription-tier';
 
 function SettingRow({ icon, label, value, onPress, colors, chevron = true }: { icon: string; label: string; value?: string; onPress?: () => void; colors: any; chevron?: boolean }) {
@@ -52,10 +54,13 @@ export default function ProfileScreen() {
   const { colors, mode, toggleTheme } = useThemeStore();
   const { userModel, isAuthenticated, logout } = useAuthStore();
   const { config, creditsRemaining, creditsUsed, loadSubscription } = useSubscriptionStore();
+  const { apiKey, setApiKey, loadApiKey } = useApiKeyStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showPlansModal, setShowPlansModal] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState('');
 
-  useEffect(() => { loadSubscription(); }, []);
+  useEffect(() => { loadSubscription(); loadApiKey(); }, []);
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -79,13 +84,39 @@ export default function ProfileScreen() {
           </FadeInView>
 
           <FadeInView delay={50}>
-            <AppCard style={[styles.infoCard, { backgroundColor: colors.primaryLight, borderColor: colors.primary }]}>
-              <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.infoTitle, { color: colors.primary }]}>No API Key Required</Text>
-                <Text style={[styles.infoSub, { color: colors.textSecondary }]}>
-                  Free extraction uses built-in OCR + pattern matching. Works offline for PDFs and printed text.
-                </Text>
+            <AppCard style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <MaterialCommunityIcons name="key-variant" size={20} color={colors.primary} />
+                <Text style={[styles.infoTitle, { color: colors.textPrimary, marginLeft: 8 }]}>API Key (Optional)</Text>
+              </View>
+              <Text style={[styles.infoSub, { color: colors.textSecondary, marginBottom: 10 }]}>
+                Add an API key for AI-powered extraction (better accuracy for images & handwritten text). Works without one for PDFs with text.
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
+                placeholder={apiKey ? '••••••••••••••••' : 'sk-... or sk-or-v1-...'}
+                placeholderTextColor={colors.textTertiary}
+                value={showApiKey ? tempApiKey || apiKey : (apiKey ? '•'.repeat(16) : tempApiKey)}
+                onChangeText={setTempApiKey}
+                secureTextEntry={!showApiKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>{showApiKey ? 'Hide' : 'Show'}</Text>
+                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  {apiKey ? (
+                    <AppButton title="Remove" size="small" variant="outline" onPress={async () => { await setApiKey(''); setTempApiKey(''); }} />
+                  ) : null}
+                  <AppButton
+                    title="Save Key"
+                    size="small"
+                    onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved securely on this device.'); }}
+                    disabled={!tempApiKey.trim()}
+                  />
+                </View>
               </View>
             </AppCard>
           </FadeInView>
@@ -193,6 +224,36 @@ export default function ProfileScreen() {
               onPress={() => setNotificationsEnabled(!notificationsEnabled)} />
             <SettingRow icon="translate" label="Language" value="English" colors={colors}
               onPress={() => Alert.alert('Language', 'Language settings coming soon')} />
+            <View style={{ marginTop: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.borderLight }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                <MaterialCommunityIcons name="key-variant" size={16} color={colors.primary} />
+                <Text style={[styles.cardTitle, { color: colors.textPrimary, marginLeft: 6, marginBottom: 0 }]}>API Key (Optional)</Text>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
+                For AI-powered image/handwritten text extraction
+              </Text>
+              <TextInput
+                style={[styles.apiKeyInput, { borderColor: colors.border, backgroundColor: colors.background, color: colors.textPrimary }]}
+                placeholder={apiKey ? '••••••••••••••••' : 'sk-... or sk-or-v1-...'}
+                placeholderTextColor={colors.textTertiary}
+                value={showApiKey ? tempApiKey || apiKey : (apiKey ? '•'.repeat(16) : tempApiKey)}
+                onChangeText={setTempApiKey}
+                secureTextEntry={!showApiKey}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)}>
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>{showApiKey ? 'Hide' : 'Show'}</Text>
+                </TouchableOpacity>
+                <AppButton
+                  title="Save"
+                  size="small"
+                  onPress={async () => { await setApiKey(tempApiKey); Alert.alert('Saved', 'API key saved.'); }}
+                  disabled={!tempApiKey.trim()}
+                />
+              </View>
+            </View>
           </AppCard>
         </FadeInView>
 
@@ -267,6 +328,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: 8 },
   plansButton: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 16, gap: 10, marginBottom: 12 },
   plansButtonText: { flex: 1, fontSize: 16, fontWeight: '700', color: '#FFFFFF' },
+  apiKeyInput: { borderWidth: 1.5, borderRadius: 12, padding: 12, fontSize: 14, fontFamily: 'monospace' },
   logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 1.5, borderRadius: 14, gap: 8, marginTop: 8 },
   logoutText: { fontSize: 15, fontWeight: '700' },
 });

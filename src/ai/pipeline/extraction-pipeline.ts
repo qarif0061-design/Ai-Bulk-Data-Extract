@@ -1,5 +1,8 @@
 import { ExtractionMode } from '../../core/enums/extraction-mode';
+import { AiProvider } from '../abstraction/ai-provider';
 import { AiResponseImpl } from '../abstraction/ai-response';
+import { PromptBuilder } from '../prompts/prompt-builder';
+import { OcrProcessor, ProcessedFile } from './ocr-processor';
 import { extractTextFromFile } from './local-text-extractor';
 import { extractDataLocally } from './rule-extractor';
 import { ResultMerger, MergedResult } from './result-merger';
@@ -15,16 +18,18 @@ export interface ExtractionProgress {
 export type ProgressCallback = (progress: ExtractionProgress) => void;
 
 export class ExtractionPipeline {
+  private provider: AiProvider | null;
   private mode: ExtractionMode;
   private customPrompt?: string;
   private onProgress?: ProgressCallback;
 
   constructor(
-    _provider: any,
+    provider: AiProvider | null,
     mode: ExtractionMode,
     customPrompt?: string,
     onProgress?: ProgressCallback
   ) {
+    this.provider = provider;
     this.mode = mode;
     this.customPrompt = customPrompt;
     this.onProgress = onProgress;
@@ -61,23 +66,33 @@ export class ExtractionPipeline {
               response: AiResponseImpl.success(JSON.stringify(localResult.data), 0, 'local-rule-engine'),
             });
           } else {
+            const aiResponse = await this.tryAiExtraction(file);
+            if (aiResponse) {
+              responses.push({ fileName: file.name, response: aiResponse });
+            } else {
+              responses.push({
+                fileName: file.name,
+                response: AiResponseImpl.success(
+                  JSON.stringify({ raw: extractedText, note: 'Text extracted but no structured data found for this mode' }),
+                  0,
+                  'local-rule-engine'
+                ),
+              });
+            }
+          }
+        } else {
+          const aiResponse = await this.tryAiExtraction(file);
+          if (aiResponse) {
+            responses.push({ fileName: file.name, response: aiResponse });
+          } else {
             responses.push({
               fileName: file.name,
-              response: AiResponseImpl.success(
-                JSON.stringify({ raw: extractedText, note: 'Text extracted but no structured data found for this mode' }),
-                0,
-                'local-rule-engine'
+              response: AiResponseImpl.failure(
+                `No text could be extracted from "${file.name}". This may be a scanned/image PDF. Please upload a PDF with selectable text, or try a clearer image.`,
+                'local'
               ),
             });
           }
-        } else {
-          responses.push({
-            fileName: file.name,
-            response: AiResponseImpl.failure(
-              `No text could be extracted from "${file.name}". This may be a scanned/image PDF. Please upload a PDF with selectable text, or try a clearer image.`,
-              'local'
-            ),
-          });
         }
       } catch (error: any) {
         responses.push({
@@ -106,6 +121,24 @@ export class ExtractionPipeline {
     });
 
     return merged;
+  }
+
+  private async tryAiExtraction(file: { uri: string; name: string }): Promise<AiResponseImpl | null> {
+    if (!this.provider) return null;
+    try {
+      const processed = await OcrProcessor.processFile(file.uri, file.name);
+      const prompt = PromptBuilder.build(this.mode, file.name, this.customPrompt);
+      const response = await this.provider.sendRequest({
+        systemPrompt: prompt.systemPrompt,
+        userPrompt: prompt.userPrompt,
+        imageBase64: processed.base64Data,
+        imageMimeType: processed.mimeType,
+      });
+      if (response.success && response.content) {
+        return AiResponseImpl.success(response.content, response.tokensUsed, response.model);
+      }
+    } catch {}
+    return null;
   }
 
   private checkHasData(data: any): boolean {
