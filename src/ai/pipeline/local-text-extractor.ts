@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 
 let tesseractModule: any = null;
 
@@ -63,7 +63,7 @@ async function extractTextFromPdf(fileUri: string): Promise<string> {
 
   // Native path
   try {
-    const base64 = await FileSystem.readAsStringAsync(fileUri, {
+    const base64 = await readAsStringAsync(fileUri, {
       encoding: 'base64',
     });
     const { PDFParser } = await import('react-native-pdf-parser');

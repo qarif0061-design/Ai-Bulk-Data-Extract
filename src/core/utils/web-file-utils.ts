@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 
 /**
  * Reads a file URI as base64 string, working on both web and native.
@@ -10,7 +10,7 @@ export async function readFileAsBase64(fileUri: string): Promise<string> {
   if (Platform.OS === 'web') {
     return readFileAsBase64Web(fileUri);
   }
-  return FileSystem.readAsStringAsync(fileUri, {
+  return readAsStringAsync(fileUri, {
     encoding: 'base64',
   });
 }

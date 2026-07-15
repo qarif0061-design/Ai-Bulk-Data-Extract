@@ -6,7 +6,7 @@ import {
 } from 'firebase/storage';
 import { initFirebase } from '../../core/config/firebase';
 import { getFirebaseStorage } from '../../core/config/firebase';
-import * as FileSystem from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { StorageException } from '../../core/errors/app-exception';
 
 export const StorageService = {
@@ -29,7 +29,7 @@ export const StorageService = {
 
   async uploadImageAsBase64(userId: string, fileUri: string, fileName: string): Promise<string> {
     try {
-      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+      const base64 = await readAsStringAsync(fileUri, {
         encoding: 'base64',
       });
       return `data:image/jpeg;base64,${base64}`;
