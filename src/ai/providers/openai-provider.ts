@@ -6,14 +6,15 @@ export class GeminiProvider implements AiProvider {
   name = 'gemini';
 
   async sendRequest(request: AiRequest): Promise<AiResponse> {
-    const apiKey = useApiKeyStore.getState().apiKey || '';
+    const storeKey = useApiKeyStore.getState().apiKey || '';
+    const apiKey = storeKey || AI_CONFIG.geminiApiKey;
     if (!apiKey) {
       return {
         content: '',
         tokensUsed: 0,
         model: AI_CONFIG.geminiModel,
         success: false,
-        error: 'No Gemini API key configured. Add one in Profile.',
+        error: 'No Gemini API key configured.',
       };
     }
 
