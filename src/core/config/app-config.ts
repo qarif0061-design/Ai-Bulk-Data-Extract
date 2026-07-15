@@ -16,13 +16,10 @@ export const FIREBASE_CONFIG = {
 };
 
 export const AI_CONFIG = {
-  baseUrl: 'https://openrouter.ai/api/v1',
-  defaultModel: 'openai/gpt-4o-mini',
-  visionModel: 'openai/gpt-4o-mini',
+  geminiModel: 'gemini-2.0-flash',
+  geminiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   maxTokens: 4096,
   temperature: 0.1,
-  appUrl: 'https://github.com/qarif0061-design/Ai-Bulk-Data-Extract',
-  appTitle: 'AI Bulk Data Extractor',
 };
 
 export const APP_CONFIG = {

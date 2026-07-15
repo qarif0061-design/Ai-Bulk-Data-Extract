@@ -20,6 +20,7 @@ import { FadeInView, ScaleTouchableOpacity } from '../../src/shared/components/a
 import { useUploadStore } from '../../src/features/upload/upload-store';
 import { useExtractionStore } from '../../src/features/extraction/extraction-store';
 import { ExtractionMode, EXTRACTION_MODES } from '../../src/core/enums/extraction-mode';
+import { FileStatus } from '../../src/core/enums/file-status';
 import { formatFileSize, getFileExtension } from '../../src/core/utils/file-utils';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
 
@@ -28,50 +29,84 @@ function isImageFile(name: string): boolean {
   return ['.png', '.jpg', '.jpeg', '.webp', '.tiff', '.tif'].includes(ext);
 }
 
-function FilePreviewCard({ file, colors }: { file: { id: string; name: string; uri: string; size: number }; colors: any }) {
+function FilePreviewCard({ file, colors, progress }: { file: { id: string; name: string; uri: string; size: number; status: FileStatus }; colors: any; progress?: number }) {
+  const isUploading = file.status === FileStatus.UPLOADING;
+  const isUploaded = file.status === FileStatus.UPLOADED;
+
   return (
-    <View style={[previewStyles.card, { backgroundColor: colors.surface, borderColor: colors.cardBorder }]}>
+    <View style={[
+      previewStyles.card,
+      {
+        backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.08)' : colors.surface,
+        borderColor: isUploading ? 'rgba(234, 67, 53, 0.4)' : colors.cardBorder,
+      },
+    ]}>
       {isImageFile(file.name) ? (
         <Image source={{ uri: file.uri }} style={previewStyles.image} resizeMode="cover" />
       ) : (
-        <View style={[previewStyles.pdf, { backgroundColor: colors.errorLight }]}>
-          <MaterialCommunityIcons name="file-pdf-box" size={32} color={colors.error} />
-          <Text style={[previewStyles.pdfLabel, { color: colors.error }]}>PDF</Text>
+        <View style={[previewStyles.pdf, { backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.12)' : colors.errorLight }]}>
+          <MaterialCommunityIcons name="file-pdf-box" size={32} color={isUploading ? '#EA4335' : colors.error} />
+          <Text style={[previewStyles.pdfLabel, { color: isUploading ? '#EA4335' : colors.error }]}>PDF</Text>
         </View>
       )}
+
+      {isUploading && (
+        <View style={previewStyles.progressBarContainer}>
+          <View style={[previewStyles.progressBarBg, { backgroundColor: 'rgba(234, 67, 53, 0.2)' }]}>
+            <View style={[previewStyles.progressBarFill, { width: `${progress || 0}%`, backgroundColor: '#EA4335' }]} />
+          </View>
+        </View>
+      )}
+
       <View style={previewStyles.info}>
         <Text style={[previewStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>{file.name}</Text>
         <Text style={[previewStyles.size, { color: colors.textTertiary }]}>{formatFileSize(file.size)}</Text>
       </View>
+
+      {isUploaded && (
+        <View style={[previewStyles.tickBadge, { backgroundColor: '#34A853' }]}>
+          <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
+        </View>
+      )}
     </View>
   );
 }
 
 const previewStyles = StyleSheet.create({
   card: {
-    width: 110,
+    width: 120,
     borderRadius: 14,
     overflow: 'hidden',
     borderWidth: 1,
   },
-  image: { width: 110, height: 90 },
-  pdf: { width: 110, height: 90, alignItems: 'center', justifyContent: 'center' },
+  image: { width: 120, height: 90 },
+  pdf: { width: 120, height: 90, alignItems: 'center', justifyContent: 'center' },
   pdfLabel: { fontSize: 10, fontWeight: '700', marginTop: 2 },
+  progressBarContainer: { paddingHorizontal: 8, paddingTop: 6 },
+  progressBarBg: { height: 3, borderRadius: 2, overflow: 'hidden' },
+  progressBarFill: { height: 3, borderRadius: 2 },
   info: { padding: 8 },
   name: { fontSize: 11, fontWeight: '600' },
   size: { fontSize: 10, marginTop: 1 },
+  tickBadge: {
+    position: 'absolute', top: 6, right: 6,
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
 
 export default function UploadScreen() {
   const router = useRouter();
   const { colors } = useThemeStore();
-  const { files, addFiles, removeFile, clearFiles } = useUploadStore();
+  const { files, addFiles, removeFile, clearFiles, uploadProgress } = useUploadStore();
   const { isProcessing, startExtraction, error, progress } = useExtractionStore();
   const [selectedModes, setSelectedModes] = useState<ExtractionMode[]>([]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [jobTitle, setJobTitle] = useState('');
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const allFilesUploaded = files.length > 0 && files.every((f) => f.status === FileStatus.UPLOADED);
+  const anyFileUploading = files.some((f) => f.status === FileStatus.UPLOADING);
 
   const toggleMode = (mode: ExtractionMode) => {
     const info = EXTRACTION_MODES.find((m) => m.mode === mode);
@@ -106,6 +141,10 @@ export default function UploadScreen() {
     }
     if (selectedModes.includes(ExtractionMode.CUSTOM) && !customPrompt.trim()) {
       Alert.alert('Custom Prompt', 'Please enter a custom extraction prompt.');
+      return;
+    }
+    if (anyFileUploading) {
+      Alert.alert('Still Uploading', 'Please wait for all files to finish uploading.');
       return;
     }
 
@@ -172,10 +211,25 @@ export default function UploadScreen() {
                     <Text style={[styles.clearAll, { color: colors.error }]}>Clear All</Text>
                   </TouchableOpacity>
                 </View>
+
+                {anyFileUploading && (
+                  <View style={styles.globalProgressContainer}>
+                    <View style={[styles.globalProgressBar, { backgroundColor: colors.borderLight }]}>
+                      <View style={[styles.globalProgressFill, {
+                        width: `${Math.round(Object.values(uploadProgress).reduce((a, b) => a + b, 0) / Object.keys(uploadProgress).length || 0)}%`,
+                        backgroundColor: '#EA4335',
+                      }]} />
+                    </View>
+                    <Text style={[styles.globalProgressText, { color: colors.textTertiary }]}>
+                      Uploading...
+                    </Text>
+                  </View>
+                )}
+
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewScroll}>
                   {files.map((file) => (
                     <View key={file.id} style={styles.previewWrapper}>
-                      <FilePreviewCard file={file} colors={colors} />
+                      <FilePreviewCard file={file} colors={colors} progress={uploadProgress[file.id]} />
                       <TouchableOpacity onPress={() => removeFile(file.id)} style={[styles.removeBtn, { backgroundColor: colors.surface }]}>
                         <MaterialCommunityIcons name="close-circle" size={20} color={colors.error} />
                       </TouchableOpacity>
@@ -334,7 +388,7 @@ export default function UploadScreen() {
           <AppButton
             title={`Extract Data${files.length > 0 && selectedModes.length > 0 ? ` (${files.length}×${selectedModes.length})` : ''}`}
             onPress={handleExtract}
-            disabled={files.length === 0 || selectedModes.length === 0}
+            disabled={files.length === 0 || selectedModes.length === 0 || anyFileUploading}
             loading={isProcessing}
             fullWidth
           />
@@ -375,6 +429,10 @@ const styles = StyleSheet.create({
   fileListHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   fileListTitle: { fontSize: 14, fontWeight: '700' },
   clearAll: { fontSize: 13, fontWeight: '600' },
+  globalProgressContainer: { marginBottom: 12 },
+  globalProgressBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
+  globalProgressFill: { height: 4, borderRadius: 2 },
+  globalProgressText: { fontSize: 11, marginTop: 4, fontStyle: 'italic' },
   previewScroll: { marginHorizontal: -4 },
   previewWrapper: { position: 'relative', marginRight: 10 },
   removeBtn: { position: 'absolute', top: -6, right: -6, borderRadius: 11 },

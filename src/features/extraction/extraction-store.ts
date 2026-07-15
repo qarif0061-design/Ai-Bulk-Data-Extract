@@ -5,8 +5,6 @@ import { AiProviderFactory } from '../../ai/abstraction/ai-provider-factory';
 import { FirestoreService } from '../../shared/services/firestore-service';
 import { JobModel, JobStatus } from '../../shared/models/job-model';
 import { useAuthStore } from '../../shared/hooks/use-auth';
-import { useApiKeyStore } from '../../shared/hooks/use-api-key';
-import { AI_CONFIG } from '../../core/config/app-config';
 
 interface ExtractionState {
   isProcessing: boolean;
@@ -63,16 +61,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({ currentJobId: jobId });
 
-      const apiKeyVal = useApiKeyStore.getState().apiKey;
-      let provider = null;
-      if (apiKeyVal && apiKeyVal.trim().length > 10) {
-        provider = AiProviderFactory.createOpenRouterProvider({
-          apiKey: apiKeyVal,
-          model: AI_CONFIG.defaultModel,
-          maxTokens: AI_CONFIG.maxTokens,
-          temperature: AI_CONFIG.temperature,
-        });
-      }
+      const provider = AiProviderFactory.createGeminiProvider();
 
       let mergedResult: any = { data: {}, totalTokensUsed: 0, errors: [] };
 

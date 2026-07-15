@@ -26,7 +26,7 @@ export interface ExtractionModeInfo {
 export const EXTRACTION_MODES: ExtractionModeInfo[] = [
   {
     mode: ExtractionMode.EXTRACT_ALL,
-    label: 'Extract All',
+    label: 'Extract all data/text',
     description: 'Extract every piece of data in a beautiful readable format',
     icon: 'select-all',
     creditCost: 3,

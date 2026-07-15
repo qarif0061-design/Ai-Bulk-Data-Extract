@@ -18,13 +18,13 @@ export interface ExtractionProgress {
 export type ProgressCallback = (progress: ExtractionProgress) => void;
 
 export class ExtractionPipeline {
-  private provider: AiProvider | null;
+  private provider: AiProvider;
   private mode: ExtractionMode;
   private customPrompt?: string;
   private onProgress?: ProgressCallback;
 
   constructor(
-    provider: AiProvider | null,
+    provider: AiProvider,
     mode: ExtractionMode,
     customPrompt?: string,
     onProgress?: ProgressCallback
@@ -124,7 +124,6 @@ export class ExtractionPipeline {
   }
 
   private async tryAiExtraction(file: { uri: string; name: string }): Promise<AiResponseImpl | null> {
-    if (!this.provider) return null;
     try {
       const processed = await OcrProcessor.processFile(file.uri, file.name);
       const prompt = PromptBuilder.build(this.mode, file.name, this.customPrompt);

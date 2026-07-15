@@ -7,16 +7,47 @@ import { FILE_LIMITS } from '../../core/constants/app-constants';
 
 interface UploadState {
   files: UploadFile[];
+  uploadProgress: Record<string, number>;
   addFiles: () => Promise<void>;
   addSingleFile: (file: UploadFile) => void;
   removeFile: (id: string) => void;
   updateFileStatus: (id: string, status: FileStatus, error?: string) => void;
   clearFiles: () => void;
   canAddMore: () => boolean;
+  simulateUpload: (id: string) => void;
 }
 
 export const useUploadStore = create<UploadState>((set, get) => ({
   files: [],
+  uploadProgress: {},
+
+  simulateUpload: (id: string) => {
+    set((state) => ({
+      files: state.files.map((f) =>
+        f.id === id ? { ...f, status: FileStatus.UPLOADING } : f
+      ),
+      uploadProgress: { ...state.uploadProgress, [id]: 0 },
+    }));
+
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += Math.random() * 25 + 10;
+      if (progress >= 100) {
+        progress = 100;
+        clearInterval(interval);
+        set((state) => ({
+          files: state.files.map((f) =>
+            f.id === id ? { ...f, status: FileStatus.UPLOADED } : f
+          ),
+          uploadProgress: { ...state.uploadProgress, [id]: 100 },
+        }));
+      } else {
+        set((state) => ({
+          uploadProgress: { ...state.uploadProgress, [id]: Math.round(progress) },
+        }));
+      }
+    }, 200);
+  },
 
   addFiles: async () => {
     try {
@@ -50,9 +81,15 @@ export const useUploadStore = create<UploadState>((set, get) => ({
         );
       }
 
-      set((state) => ({
-        files: [...state.files, ...newFiles].slice(0, FILE_LIMITS.maxFilesPerJob),
-      }));
+      if (newFiles.length > 0) {
+        set((state) => ({
+          files: [...state.files, ...newFiles].slice(0, FILE_LIMITS.maxFilesPerJob),
+        }));
+
+        for (const file of newFiles) {
+          get().simulateUpload(file.id);
+        }
+      }
     } catch (error) {
       console.error('Failed to pick files:', error);
     }
@@ -63,12 +100,17 @@ export const useUploadStore = create<UploadState>((set, get) => ({
       if (!isWithinFileLimit(state.files.length, 1)) return state;
       return { files: [...state.files, file] };
     });
+    get().simulateUpload(file.id);
   },
 
   removeFile: (id: string) => {
-    set((state) => ({
-      files: state.files.filter((f) => f.id !== id),
-    }));
+    set((state) => {
+      const { [id]: _progress, ...rest } = state.uploadProgress;
+      return {
+        files: state.files.filter((f) => f.id !== id),
+        uploadProgress: rest,
+      };
+    });
   },
 
   updateFileStatus: (id: string, status: FileStatus, error?: string) => {
@@ -79,7 +121,7 @@ export const useUploadStore = create<UploadState>((set, get) => ({
     }));
   },
 
-  clearFiles: () => set({ files: [] }),
+  clearFiles: () => set({ files: [], uploadProgress: {} }),
 
   canAddMore: () => get().files.length < FILE_LIMITS.maxFilesPerJob,
 }));
