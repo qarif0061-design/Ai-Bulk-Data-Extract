@@ -32,6 +32,10 @@ export const AI_CONFIG = {
   grokModel: 'grok-4-1-fast',
   grokBaseUrl: 'https://api.x.ai/v1',
 
+  openrouterApiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '',
+  openrouterModel: 'google/gemini-2.0-flash-001',
+  openrouterBaseUrl: 'https://openrouter.ai/api/v1',
+
   maxTokens: 4096,
   temperature: 0.1,
 };
