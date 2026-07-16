@@ -1,5 +1,6 @@
 import { AiProvider, AiRequest, AiResponse } from '../abstraction/ai-provider';
 import { GeminiProvider } from './gemini-provider';
+import { GrokProvider } from './grok-provider';
 import { OpenAiProvider } from './openai-provider';
 import { AnthropicProvider } from './anthropic-provider';
 
@@ -11,6 +12,7 @@ export class ProviderChain implements AiProvider {
   constructor() {
     this.providers = [
       new GeminiProvider(),
+      new GrokProvider(),
       new OpenAiProvider(),
       new AnthropicProvider(),
     ];
@@ -24,6 +26,7 @@ export class ProviderChain implements AiProvider {
     this.results = [];
     const availableProviders = this.providers.filter((p) => {
       if (p.name === 'gemini') return !!process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+      if (p.name === 'grok') return !!process.env.EXPO_PUBLIC_GROK_API_KEY;
       if (p.name === 'openai') return !!process.env.EXPO_PUBLIC_OPENAI_API_KEY;
       if (p.name === 'anthropic') return !!process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY;
       return false;

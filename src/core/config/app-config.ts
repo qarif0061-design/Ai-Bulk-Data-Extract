@@ -28,6 +28,10 @@ export const AI_CONFIG = {
   anthropicModel: 'claude-3-5-haiku-20241022',
   anthropicBaseUrl: 'https://api.anthropic.com/v1',
 
+  grokApiKey: process.env.EXPO_PUBLIC_GROK_API_KEY || '',
+  grokModel: 'grok-4-1-fast',
+  grokBaseUrl: 'https://api.x.ai/v1',
+
   maxTokens: 4096,
   temperature: 0.1,
 };
