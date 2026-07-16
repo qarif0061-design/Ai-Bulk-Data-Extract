@@ -57,7 +57,7 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     mode: ExtractionMode.LAST_NAME,
     label: 'Last Name',
     description: 'Extract last/surnames',
-    icon: 'account-badge',
+    icon: 'account-details',
     creditCost: 1,
   },
   {

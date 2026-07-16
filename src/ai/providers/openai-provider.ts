@@ -24,6 +24,25 @@ export class GeminiProvider implements AiProvider {
       };
     }
 
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const result = await this.doRequest(apiKey, request);
+      if (result.success || result.error?.includes('invalid authentication')) {
+        return result;
+      }
+      if (result.error?.includes('429') || result.error?.includes('RESOURCE_EXHAUSTED') || result.error?.includes('quota')) {
+        const retryDelay = attempt * 25000;
+        console.warn(`[GeminiProvider] Quota hit, retry ${attempt}/${maxRetries} in ${retryDelay / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
+      }
+      return result;
+    }
+    return this.doRequest(apiKey, request);
+  }
+
+  private async doRequest(apiKey: string, request: AiRequest): Promise<AiResponse> {
+
     const url = `${AI_CONFIG.geminiBaseUrl}/models/${AI_CONFIG.geminiModel}:generateContent?key=${apiKey}`;
     console.log(`[GeminiProvider] URL: ${AI_CONFIG.geminiBaseUrl}/models/${AI_CONFIG.geminiModel}:generateContent`);
     console.log(`[GeminiProvider] Model: ${AI_CONFIG.geminiModel}`);
