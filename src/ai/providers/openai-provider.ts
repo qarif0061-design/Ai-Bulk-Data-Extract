@@ -7,9 +7,10 @@ export class GeminiProvider implements AiProvider {
 
   async sendRequest(request: AiRequest): Promise<AiResponse> {
     const storeKey = useApiKeyStore.getState().apiKey || '';
-    const apiKey = storeKey || AI_CONFIG.geminiApiKey;
-    console.log(`[GeminiProvider] Store key present: ${!!storeKey}, Config key present: ${!!AI_CONFIG.geminiApiKey}`);
-    console.log(`[GeminiProvider] Using key source: ${storeKey ? 'store' : 'config'}`);
+    const isValidStoreKey = storeKey.startsWith('AIzaSy');
+    const apiKey = (isValidStoreKey ? storeKey : '') || AI_CONFIG.geminiApiKey;
+    console.log(`[GeminiProvider] Store key present: ${!!storeKey}, valid format: ${isValidStoreKey}, Config key present: ${!!AI_CONFIG.geminiApiKey}`);
+    console.log(`[GeminiProvider] Using key source: ${isValidStoreKey && storeKey ? 'store' : 'config'}`);
     console.log(`[GeminiProvider] Key prefix: ${apiKey.substring(0, 8)}...`);
 
     if (!apiKey) {

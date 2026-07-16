@@ -57,14 +57,14 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     mode: ExtractionMode.LAST_NAME,
     label: 'Last Name',
     description: 'Extract last/surnames',
-    icon: 'account-badge-outline',
+    icon: 'account-badge',
     creditCost: 1,
   },
   {
     mode: ExtractionMode.AGE,
     label: 'Age',
     description: 'Extract age information',
-    icon: 'cake-outline',
+    icon: 'cake',
     creditCost: 1,
   },
   {
@@ -78,14 +78,14 @@ export const EXTRACTION_MODES: ExtractionModeInfo[] = [
     mode: ExtractionMode.SEX,
     label: 'Sex',
     description: 'Extract sex/gender field values',
-    icon: 'human-male-female-variant',
+    icon: 'gender-male-female',
     creditCost: 1,
   },
   {
     mode: ExtractionMode.MARITAL_STATUS,
     label: 'Marital Status',
     description: 'Extract marital status information',
-    icon: 'ring-outline',
+    icon: 'ring',
     creditCost: 1,
   },
   {

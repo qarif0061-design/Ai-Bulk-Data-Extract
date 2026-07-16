@@ -16,7 +16,7 @@ export const FIREBASE_CONFIG = {
 };
 
 export const AI_CONFIG = {
-  geminiApiKey: 'AQ.Ab8RN6KEMpsnehwugSG1iM3sCjDx3LVjdJ99yUP-7w53vAqbug',
+  geminiApiKey: 'AIzaSyCV8hQaBIZS8TBUlOkd5Lhqy8RnMtcGNUM',
   geminiModel: 'gemini-2.0-flash',
   geminiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
   maxTokens: 4096,
