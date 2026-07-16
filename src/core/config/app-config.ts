@@ -33,7 +33,7 @@ export const AI_CONFIG = {
   grokBaseUrl: 'https://api.x.ai/v1',
 
   openrouterApiKey: process.env.EXPO_PUBLIC_OPENROUTER_API_KEY || '',
-  openrouterModel: 'google/gemini-2.0-flash-001',
+  openrouterModel: 'google/gemini-2.5-flash',
   openrouterBaseUrl: 'https://openrouter.ai/api/v1',
 
   maxTokens: 4096,
