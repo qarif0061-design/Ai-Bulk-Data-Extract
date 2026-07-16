@@ -1,123 +1,65 @@
 import { AiProvider, AiRequest, AiResponse } from '../abstraction/ai-provider';
 import { AI_CONFIG } from '../../core/config/app-config';
-import { useApiKeyStore } from '../../shared/hooks/use-api-key';
 
-export class GeminiProvider implements AiProvider {
-  name = 'gemini';
+export class OpenAiProvider implements AiProvider {
+  name = 'openai';
 
   async sendRequest(request: AiRequest): Promise<AiResponse> {
-    const storeKey = useApiKeyStore.getState().apiKey || '';
-    const isValidStoreKey = storeKey.startsWith('AIzaSy');
-    const apiKey = (isValidStoreKey ? storeKey : '') || AI_CONFIG.geminiApiKey;
-    console.log(`[GeminiProvider] Store key present: ${!!storeKey}, valid format: ${isValidStoreKey}, Config key present: ${!!AI_CONFIG.geminiApiKey}`);
-    console.log(`[GeminiProvider] Using key source: ${isValidStoreKey && storeKey ? 'store' : 'config'}`);
-    console.log(`[GeminiProvider] Key prefix: ${apiKey.substring(0, 8)}...`);
-
+    const apiKey = AI_CONFIG.openaiApiKey;
     if (!apiKey) {
-      console.error('[GeminiProvider] No API key configured');
-      return {
-        content: '',
-        tokensUsed: 0,
-        model: AI_CONFIG.geminiModel,
-        success: false,
-        error: 'No Gemini API key configured.',
-      };
+      return { content: '', tokensUsed: 0, model: AI_CONFIG.openaiModel, success: false, error: 'No OpenAI API key configured.' };
     }
 
-    const maxRetries = 3;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const result = await this.doRequest(apiKey, request);
-      if (result.success || result.error?.includes('invalid authentication')) {
-        return result;
-      }
-      if (result.error?.includes('429') || result.error?.includes('RESOURCE_EXHAUSTED') || result.error?.includes('quota')) {
-        const retryDelay = attempt * 25000;
-        console.warn(`[GeminiProvider] Quota hit, retry ${attempt}/${maxRetries} in ${retryDelay / 1000}s...`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        continue;
-      }
-      return result;
-    }
-    return this.doRequest(apiKey, request);
-  }
+    const url = `${AI_CONFIG.openaiBaseUrl}/chat/completions`;
+    const messages: any[] = [
+      { role: 'system', content: request.systemPrompt },
+      { role: 'user', content: [] },
+    ];
 
-  private async doRequest(apiKey: string, request: AiRequest): Promise<AiResponse> {
-
-    const url = `${AI_CONFIG.geminiBaseUrl}/models/${AI_CONFIG.geminiModel}:generateContent?key=${apiKey}`;
-    console.log(`[GeminiProvider] URL: ${AI_CONFIG.geminiBaseUrl}/models/${AI_CONFIG.geminiModel}:generateContent`);
-    console.log(`[GeminiProvider] Model: ${AI_CONFIG.geminiModel}`);
-
-    const parts: any[] = [{ text: `${request.systemPrompt}\n\n${request.userPrompt}` }];
+    const userContent: any[] = [{ type: 'text', text: request.userPrompt }];
 
     if (request.imageBase64 && request.imageMimeType) {
-      parts.push({
-        inline_data: {
-          mime_type: request.imageMimeType,
-          data: request.imageBase64,
-        },
+      userContent.push({
+        type: 'image_url',
+        image_url: { url: `data:${request.imageMimeType};base64,${request.imageBase64}`, detail: 'high' },
       });
-      console.log(`[GeminiProvider] Image attached: mimeType=${request.imageMimeType}, base64 length=${request.imageBase64.length}`);
-    } else {
-      console.log(`[GeminiProvider] No image attached`);
     }
 
+    messages[1].content = userContent;
+
     const body = {
-      contents: [{ parts }],
-      generationConfig: {
-        maxOutputTokens: request.maxTokens || AI_CONFIG.maxTokens,
-        temperature: request.temperature ?? AI_CONFIG.temperature,
-      },
+      model: AI_CONFIG.openaiModel,
+      messages,
+      max_tokens: request.maxTokens || AI_CONFIG.maxTokens,
+      temperature: request.temperature ?? AI_CONFIG.temperature,
     };
 
-    console.log(`[GeminiProvider] Sending request...`);
     try {
+      console.log(`[OpenAI] Sending request to ${AI_CONFIG.openaiModel}...`);
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify(body),
       });
 
-      console.log(`[GeminiProvider] Response status: ${response.status} ${response.statusText}`);
+      console.log(`[OpenAI] Response status: ${response.status}`);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData?.error?.message || `HTTP ${response.status}: ${response.statusText}`;
-        console.error(`[GeminiProvider] API error: ${errorMessage}`);
-        console.error(`[GeminiProvider] Error details:`, JSON.stringify(errorData?.error || {}));
-        return {
-          content: '',
-          tokensUsed: 0,
-          model: AI_CONFIG.geminiModel,
-          success: false,
-          error: errorMessage,
-        };
+        const errorMessage = errorData?.error?.message || `HTTP ${response.status}`;
+        console.error(`[OpenAI] Error: ${errorMessage}`);
+        return { content: '', tokensUsed: 0, model: AI_CONFIG.openaiModel, success: false, error: errorMessage };
       }
 
       const data = await response.json();
-      console.log(`[GeminiProvider] Response candidates: ${data.candidates?.length || 0}`);
-      console.log(`[GeminiProvider] Token usage: ${data.usageMetadata?.totalTokenCount || 0}`);
+      const text = data.choices?.[0]?.message?.content || '';
+      const tokensUsed = data.usage?.total_tokens || 0;
+      console.log(`[OpenAI] Success: ${text.length} chars, ${tokensUsed} tokens`);
 
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const tokensUsed = data.usageMetadata?.totalTokenCount || 0;
-
-      console.log(`[GeminiProvider] Response text length: ${text.length}`);
-      console.log(`[GeminiProvider] Response text preview: ${text.substring(0, 200)}`);
-
-      return {
-        content: text,
-        tokensUsed,
-        model: AI_CONFIG.geminiModel,
-        success: true,
-      };
+      return { content: text, tokensUsed, model: AI_CONFIG.openaiModel, success: true };
     } catch (error: any) {
-      console.error(`[GeminiProvider] Network error:`, error?.message);
-      return {
-        content: '',
-        tokensUsed: 0,
-        model: AI_CONFIG.geminiModel,
-        success: false,
-        error: error?.message || 'Network error. Please check your connection.',
-      };
+      console.error(`[OpenAI] Network error:`, error?.message);
+      return { content: '', tokensUsed: 0, model: AI_CONFIG.openaiModel, success: false, error: error?.message || 'Network error' };
     }
   }
 }

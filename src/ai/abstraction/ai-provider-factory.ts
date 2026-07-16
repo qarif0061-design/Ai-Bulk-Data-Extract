@@ -1,8 +1,8 @@
 import { AiProvider } from './ai-provider';
-import { GeminiProvider } from '../providers/openai-provider';
+import { ProviderChain } from '../providers/provider-chain';
 
 export class AiProviderFactory {
-  static createGeminiProvider(): AiProvider {
-    return new GeminiProvider();
+  static createProvider(): AiProvider {
+    return new ProviderChain();
   }
 }

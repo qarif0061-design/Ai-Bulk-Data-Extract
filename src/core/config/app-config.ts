@@ -16,9 +16,18 @@ export const FIREBASE_CONFIG = {
 };
 
 export const AI_CONFIG = {
-  geminiApiKey: 'AIzaSyCV8hQaBIZS8TBUlOkd5Lhqy8RnMtcGNUM',
+  geminiApiKey: process.env.EXPO_PUBLIC_GEMINI_API_KEY || '',
   geminiModel: 'gemini-2.0-flash',
   geminiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+
+  openaiApiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY || '',
+  openaiModel: 'gpt-4o-mini',
+  openaiBaseUrl: 'https://api.openai.com/v1',
+
+  anthropicApiKey: process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '',
+  anthropicModel: 'claude-3-5-haiku-20241022',
+  anthropicBaseUrl: 'https://api.anthropic.com/v1',
+
   maxTokens: 4096,
   temperature: 0.1,
 };

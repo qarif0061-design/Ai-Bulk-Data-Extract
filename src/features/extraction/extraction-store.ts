@@ -61,7 +61,7 @@ export const useExtractionStore = create<ExtractionState>((set, get) => ({
 
       set({ currentJobId: jobId });
 
-      const provider = AiProviderFactory.createGeminiProvider();
+      const provider = AiProviderFactory.createProvider();
 
       let mergedResult: any = { data: {}, totalTokensUsed: 0, errors: [] };
 
