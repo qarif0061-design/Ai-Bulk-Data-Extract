@@ -36,10 +36,12 @@ export class ExtractionPipeline {
   }
 
   async processFiles(files: { uri: string; name: string }[]): Promise<MergedResult> {
+    console.log(`[Pipeline] Starting extraction with mode: ${this.mode}, files: ${files.length}`);
     const responses: { fileName: string; response: any }[] = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
+      console.log(`[Pipeline] Processing file ${i + 1}/${files.length}: ${file.name}`);
 
       this.reportProgress({
         totalFiles: files.length,
@@ -52,22 +54,29 @@ export class ExtractionPipeline {
         let extractedText = '';
 
         try {
+          console.log(`[Pipeline] Attempting local text extraction for "${file.name}"...`);
           extractedText = await extractTextFromFile(file.uri, file.name);
-          console.log(`[Pipeline] Local text for "${file.name}": ${extractedText.length} chars`);
+          console.log(`[Pipeline] Local text extraction result: ${extractedText.length} chars`);
+          if (extractedText.length > 0) {
+            console.log(`[Pipeline] Local text preview: ${extractedText.substring(0, 200)}`);
+          }
         } catch (e: any) {
           console.warn(`[Pipeline] Local text extraction failed for "${file.name}":`, e?.message);
         }
 
         if (extractedText && extractedText.trim().length > 5) {
+          console.log(`[Pipeline] Running rule engine for "${file.name}"...`);
           const localResult = extractDataLocally(extractedText, this.mode, file.name);
           const hasData = this.checkHasData(localResult.data);
-          console.log(`[Pipeline] Rule engine for "${file.name}": hasData=${hasData}`);
+          console.log(`[Pipeline] Rule engine result: hasData=${hasData}, keys=${Object.keys(localResult.data).join(', ')}`);
           if (hasData) {
+            console.log(`[Pipeline] Rule engine found data, skipping AI call`);
             responses.push({
               fileName: file.name,
               response: AiResponseImpl.success(JSON.stringify(localResult.data), 0, 'local-rule-engine'),
             });
           } else {
+            console.log(`[Pipeline] Rule engine found no data, trying AI extraction...`);
             const aiResponse = await this.tryAiExtraction(file);
             if (aiResponse) {
               responses.push({ fileName: file.name, response: aiResponse });
@@ -83,7 +92,7 @@ export class ExtractionPipeline {
             }
           }
         } else {
-          console.log(`[Pipeline] No local text for "${file.name}", trying AI...`);
+          console.log(`[Pipeline] No local text for "${file.name}" (length: ${extractedText.length}), trying AI...`);
           const aiResponse = await this.tryAiExtraction(file);
           if (aiResponse) {
             responses.push({ fileName: file.name, response: aiResponse });
@@ -130,13 +139,15 @@ export class ExtractionPipeline {
 
   private async tryAiExtraction(file: { uri: string; name: string }): Promise<AiResponseImpl | null> {
     try {
+      console.log(`[Pipeline] Starting AI extraction for "${file.name}"...`);
       console.log(`[Pipeline] OCR processing "${file.name}"...`);
       const processed = await OcrProcessor.processFile(file.uri, file.name);
       console.log(`[Pipeline] OCR done. base64 length: ${processed.base64Data.length}, mime: ${processed.mimeType}`);
 
       const prompt = PromptBuilder.build(this.mode, file.name, this.customPrompt);
-      console.log(`[Pipeline] Sending to Gemini API...`);
+      console.log(`[Pipeline] Prompt built. System prompt length: ${prompt.systemPrompt.length}`);
 
+      console.log(`[Pipeline] Sending to Gemini API...`);
       const response = await this.provider.sendRequest({
         systemPrompt: prompt.systemPrompt,
         userPrompt: prompt.userPrompt,
@@ -146,6 +157,7 @@ export class ExtractionPipeline {
 
       console.log(`[Pipeline] Gemini response: success=${response.success}, content length=${response.content?.length || 0}`);
       if (response.error) console.warn(`[Pipeline] Gemini error: ${response.error}`);
+      if (response.content) console.log(`[Pipeline] Response preview: ${response.content.substring(0, 200)}`);
 
       if (response.success && response.content) {
         return AiResponseImpl.success(response.content, response.tokensUsed, response.model);

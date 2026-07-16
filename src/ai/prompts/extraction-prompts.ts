@@ -116,4 +116,39 @@ Return ONLY valid JSON with this structure:
     systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and follow the user instructions to extract data.',
     userPrompt: `${customPrompt || 'Extract all relevant data from this document.'}\n\nLook at the attached document "${fileName}". It may contain handwritten text. Follow the instructions above and extract the requested data.\n\nReturn ONLY valid JSON matching the requested extraction.`,
   }),
+
+  [ExtractionMode.FULL_NAME]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL full names (first name + last name combined) visible in the document. Include middle names if present.',
+    userPrompt: `Look at the attached document "${fileName}". Find every full name visible in this document, including handwritten ones. Extract both first and last names together.\n\nReturn ONLY valid JSON:\n{"fullNames": [{"firstName": "John", "lastName": "Doe", "middleName": "M", "fullName": "John M Doe", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.FIRST_NAME]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL first/given names visible in the document.',
+    userPrompt: `Look at the attached document "${fileName}". Find every first name or given name visible in this document, including handwritten ones.\n\nReturn ONLY valid JSON:\n{"firstNames": [{"firstName": "John", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.LAST_NAME]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL last/surnames visible in the document.',
+    userPrompt: `Look at the attached document "${fileName}". Find every last name or surname visible in this document, including handwritten ones.\n\nReturn ONLY valid JSON:\n{"lastNames": [{"lastName": "Doe", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.AGE]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL age information visible in the document. This includes explicit ages, date of birth fields (calculate age from DOB), and any age-related data.',
+    userPrompt: `Look at the attached document "${fileName}". Find every age or age-related information visible in this document, including handwritten ones. If you find date of birth, calculate the approximate age.\n\nReturn ONLY valid JSON:\n{"ages": [{"age": 25, "dateOfBirth": "1999-05-15", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.GENDER]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL gender information visible in the document. This includes fields labeled "Gender", "Sex", pronouns, or any gender-related data.',
+    userPrompt: `Look at the attached document "${fileName}". Find every gender-related field or value visible in this document, including handwritten ones.\n\nReturn ONLY valid JSON:\n{"genders": [{"gender": "Male", "originalValue": "as shown in document", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.SEX]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL sex field values visible in the document. This includes fields labeled "Sex", "Gender", or "M/F" type values.',
+    userPrompt: `Look at the attached document "${fileName}". Find every sex or gender field value visible in this document, including handwritten ones.\n\nReturn ONLY valid JSON:\n{"sexes": [{"sex": "Male", "originalValue": "M", "fieldName": "Gender", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
+
+  [ExtractionMode.MARITAL_STATUS]: (fileName: string) => ({
+    systemPrompt: 'You are a precise data extraction assistant with exceptional vision. You will be given an image or PDF that may contain handwritten text. Look very carefully at the visual content and extract ALL marital status information visible in the document. This includes fields like "Marital Status", "Single", "Married", "Divorced", "Widowed", etc.',
+    userPrompt: `Look at the attached document "${fileName}". Find every marital status field or value visible in this document, including handwritten ones.\n\nReturn ONLY valid JSON:\n{"maritalStatuses": [{"status": "Married", "originalValue": "as shown", "context": "surrounding text", "isHandwritten": false}]}`,
+  }),
 };

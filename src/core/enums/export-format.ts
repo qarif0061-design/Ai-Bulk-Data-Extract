@@ -2,6 +2,9 @@ export enum ExportFormat {
   EXCEL = 'excel',
   CSV = 'csv',
   JSON = 'json',
+  PDF = 'pdf',
+  TXT = 'txt',
+  GOOGLE_SHEETS = 'google_sheets',
 }
 
 export const EXPORT_FORMAT_INFO: Record<ExportFormat, { label: string; mimeType: string; extension: string; icon: string }> = {
@@ -22,5 +25,23 @@ export const EXPORT_FORMAT_INFO: Record<ExportFormat, { label: string; mimeType:
     mimeType: 'application/json',
     extension: '.json',
     icon: 'code-json',
+  },
+  [ExportFormat.PDF]: {
+    label: 'PDF (.pdf)',
+    mimeType: 'application/pdf',
+    extension: '.pdf',
+    icon: 'file-pdf-box',
+  },
+  [ExportFormat.TXT]: {
+    label: 'Text (.txt)',
+    mimeType: 'text/plain',
+    extension: '.txt',
+    icon: 'file-document-outline',
+  },
+  [ExportFormat.GOOGLE_SHEETS]: {
+    label: 'Google Sheets',
+    mimeType: 'text/csv',
+    extension: '.csv',
+    icon: 'table-large',
   },
 };

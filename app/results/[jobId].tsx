@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Modal, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,9 @@ if (Platform.OS !== 'web') {
   try { Clipboard = require('expo-clipboard'); } catch {}
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
 export default function ResultsScreen() {
   const { jobId } = useLocalSearchParams<{ jobId: string }>();
   const router = useRouter();
@@ -36,6 +39,7 @@ export default function ResultsScreen() {
   const [activeTab, setActiveTab] = useState<'data' | 'raw'>('data');
   const [showFeedback, setShowFeedback] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => { loadResults(); loadRating(); }, [jobId]);
 
@@ -69,6 +73,16 @@ export default function ResultsScreen() {
     return { headers, rows };
   };
 
+  const getTabSpecificData = useCallback(() => {
+    if (!extractedData) return '';
+    if (activeTab === 'raw') {
+      return JSON.stringify(extractedData, null, 2);
+    }
+    const flatData = ResultMerger.flattenForExport(extractedData);
+    if (flatData.length === 0) return JSON.stringify(extractedData, null, 2);
+    return JSON.stringify(flatData, null, 2);
+  }, [extractedData, activeTab]);
+
   const triggerFeedbackIfAllowed = useCallback(() => {
     if (!hasRated) {
       setShowFeedback(true);
@@ -77,7 +91,7 @@ export default function ResultsScreen() {
 
   const handleCopyText = useCallback(async () => {
     if (!extractedData) return;
-    const text = JSON.stringify(extractedData, null, 2);
+    const text = getTabSpecificData();
     try {
       if (Clipboard) {
         await Clipboard.setStringAsync(text);
@@ -93,7 +107,7 @@ export default function ResultsScreen() {
     } catch (error: any) {
       Alert.alert('Copy Failed', error.message || 'Could not copy to clipboard');
     }
-  }, [extractedData, hasRated, triggerFeedbackIfAllowed]);
+  }, [extractedData, activeTab, getTabSpecificData, hasRated, triggerFeedbackIfAllowed]);
 
   const handleExport = async (fmt: ExportFormat) => {
     if (!extractedData || !job) return;
@@ -107,14 +121,29 @@ export default function ResultsScreen() {
         case ExportFormat.JSON:
           content = JSON.stringify(extractedData, null, 2);
           fileName += '.json'; mimeType = 'application/json'; break;
+        case ExportFormat.TXT:
+          content = JSON.stringify(extractedData, null, 2);
+          fileName += '.txt'; mimeType = 'text/plain'; break;
         case ExportFormat.CSV:
         case ExportFormat.EXCEL:
+        case ExportFormat.GOOGLE_SHEETS:
           if (flatData.length > 0) {
             const headers = Object.keys(flatData[0]);
-            const csvRows = [headers.join(','), ...flatData.map((row) => headers.map((h) => { const val = String(row[h] ?? ''); return val.includes(',') ? `"${val}"` : val; }).join(','))];
+            const csvRows = [headers.join(','), ...flatData.map((row) => headers.map((h) => { const val = String(row[h] ?? ''); return val.includes(',') || val.includes('"') || val.includes('\n') ? `"${val.replace(/"/g, '""')}"` : val; }).join(','))];
             content = csvRows.join('\n');
           }
+          if (fmt === ExportFormat.GOOGLE_SHEETS) {
+            const sheetsUrl = 'https://docs.google.com/spreadsheets/d/new';
+            content = content + '\n\n--- How to import into Google Sheets ---\n' +
+              '1. Go to: ' + sheetsUrl + '\n' +
+              '2. File > Import > Upload\n' +
+              '3. Select the exported CSV file\n' +
+              '4. Choose "Replace spreadsheet" and click Import\n';
+          }
           fileName += '.csv'; mimeType = 'text/csv'; break;
+        case ExportFormat.PDF:
+          content = buildPdfContent(extractedData, job.title);
+          fileName += '.txt'; mimeType = 'text/plain'; break;
       }
 
       if (Platform.OS === 'web') {
@@ -131,7 +160,7 @@ export default function ResultsScreen() {
         const FileSystem = require('expo-file-system');
         const Sharing = require('expo-sharing');
         const fileUri = `${FileSystem.cacheDirectory}${fileName}`;
-        await FileSystem.writeAsStringAsync(fileUri, content, { encoding: FileSystem.EncodingType.UTF8 });
+        await FileSystem.writeAsStringAsync(fileUri, content, { encoding: 'utf8' });
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(fileUri, { mimeType, dialogTitle: `Export as ${EXPORT_FORMAT_INFO[fmt].label}` });
         } else { Alert.alert('Export', `File saved to: ${fileUri}`); }
@@ -139,6 +168,32 @@ export default function ResultsScreen() {
 
       triggerFeedbackIfAllowed();
     } catch (error: any) { Alert.alert('Export Failed', error.message || 'Could not export data'); }
+  };
+
+  const buildPdfContent = (data: any, title: string): string => {
+    const lines: string[] = [];
+    lines.push('='.repeat(60));
+    lines.push(title.toUpperCase());
+    lines.push('='.repeat(60));
+    lines.push('');
+
+    const flatData = ResultMerger.flattenForExport(data);
+    if (flatData.length > 0) {
+      const headers = Object.keys(flatData[0]);
+      lines.push(headers.join(' | '));
+      lines.push('-'.repeat(60));
+      for (const row of flatData) {
+        lines.push(headers.map(h => String(row[h] ?? '')).join(' | '));
+      }
+    } else {
+      lines.push(JSON.stringify(data, null, 2));
+    }
+
+    lines.push('');
+    lines.push('='.repeat(60));
+    lines.push(`Generated by AI Bulk Data Extractor`);
+    lines.push(`Date: ${new Date().toLocaleDateString()}`);
+    return lines.join('\n');
   };
 
   const handleFeedbackClose = () => {
@@ -151,6 +206,7 @@ export default function ResultsScreen() {
   };
 
   const { headers, rows } = getTableData();
+  const copyLabel = activeTab === 'raw' ? 'Copy JSON' : 'Copy Data';
 
   if (isLoading) return <View style={[styles.centered, { backgroundColor: colors.background }]}><LoadingOverlay visible={true} message="Loading results..." /></View>;
   if (!extractedData) return (
@@ -231,13 +287,13 @@ export default function ResultsScreen() {
       <View style={[styles.bottomBar, { backgroundColor: colors.surface, borderTopColor: colors.borderLight }]}>
         <ScaleTouchableOpacity onPress={handleCopyText} style={[styles.copyBtn, { borderColor: colors.primary, backgroundColor: colors.primaryLight }]}>
           <MaterialCommunityIcons name={copied ? 'check' : 'content-copy'} size={18} color={colors.primary} />
-          <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Copied!' : 'Copy All'}</Text>
+          <Text style={[styles.copyBtnText, { color: colors.primary }]}>{copied ? 'Copied!' : copyLabel}</Text>
         </ScaleTouchableOpacity>
         <View style={styles.exportButtons}>
           {(Object.values(ExportFormat)).map((fmt) => (
             <ScaleTouchableOpacity key={fmt} onPress={() => handleExport(fmt)} style={[styles.exportBtn, { borderColor: colors.primary }]}>
               <MaterialCommunityIcons name={EXPORT_FORMAT_INFO[fmt].icon as any} size={18} color={colors.primary} />
-              <Text style={[styles.exportBtnText, { color: colors.primary }]}>{fmt.toUpperCase()}</Text>
+              <Text style={[styles.exportBtnText, { color: colors.primary }]}>{fmt === ExportFormat.GOOGLE_SHEETS ? 'Sheets' : fmt.toUpperCase()}</Text>
             </ScaleTouchableOpacity>
           ))}
         </View>

@@ -8,6 +8,8 @@ import {
   Alert,
   TextInput,
   Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,51 +26,56 @@ import { FileStatus } from '../../src/core/enums/file-status';
 import { formatFileSize, getFileExtension } from '../../src/core/utils/file-utils';
 import { useThemeStore } from '../../src/shared/hooks/use-theme';
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+
 function isImageFile(name: string): boolean {
   const ext = getFileExtension(name);
   return ['.png', '.jpg', '.jpeg', '.webp', '.tiff', '.tif'].includes(ext);
 }
 
-function FilePreviewCard({ file, colors, progress }: { file: { id: string; name: string; uri: string; size: number; status: FileStatus }; colors: any; progress?: number }) {
+function FilePreviewCard({ file, colors, progress, onPress }: { file: { id: string; name: string; uri: string; size: number; status: FileStatus }; colors: any; progress?: number; onPress?: () => void }) {
   const isUploading = file.status === FileStatus.UPLOADING;
   const isUploaded = file.status === FileStatus.UPLOADED;
 
   return (
-    <View style={[
-      previewStyles.card,
-      {
-        backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.08)' : colors.surface,
-        borderColor: isUploading ? 'rgba(234, 67, 53, 0.4)' : colors.cardBorder,
-      },
-    ]}>
-      {isImageFile(file.name) ? (
-        <Image source={{ uri: file.uri }} style={previewStyles.image} resizeMode="cover" />
-      ) : (
-        <View style={[previewStyles.pdf, { backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.12)' : colors.errorLight }]}>
-          <MaterialCommunityIcons name="file-pdf-box" size={32} color={isUploading ? '#EA4335' : colors.error} />
-          <Text style={[previewStyles.pdfLabel, { color: isUploading ? '#EA4335' : colors.error }]}>PDF</Text>
-        </View>
-      )}
-
-      {isUploading && (
-        <View style={previewStyles.progressBarContainer}>
-          <View style={[previewStyles.progressBarBg, { backgroundColor: 'rgba(234, 67, 53, 0.2)' }]}>
-            <View style={[previewStyles.progressBarFill, { width: `${progress || 0}%`, backgroundColor: '#EA4335' }]} />
+    <ScaleTouchableOpacity onPress={onPress} disabled={isUploading}>
+      <View style={[
+        previewStyles.card,
+        {
+          backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.08)' : colors.surface,
+          borderColor: isUploading ? 'rgba(234, 67, 53, 0.4)' : colors.cardBorder,
+        },
+      ]}>
+        {isImageFile(file.name) ? (
+          <Image source={{ uri: file.uri }} style={previewStyles.image} resizeMode="cover" />
+        ) : (
+          <View style={[previewStyles.pdf, { backgroundColor: isUploading ? 'rgba(234, 67, 53, 0.12)' : colors.errorLight }]}>
+            <MaterialCommunityIcons name="file-pdf-box" size={32} color={isUploading ? '#EA4335' : colors.error} />
+            <Text style={[previewStyles.pdfLabel, { color: isUploading ? '#EA4335' : colors.error }]}>PDF</Text>
           </View>
-        </View>
-      )}
+        )}
 
-      <View style={previewStyles.info}>
-        <Text style={[previewStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>{file.name}</Text>
-        <Text style={[previewStyles.size, { color: colors.textTertiary }]}>{formatFileSize(file.size)}</Text>
+        {isUploading && (
+          <View style={previewStyles.progressBarContainer}>
+            <View style={[previewStyles.progressBarBg, { backgroundColor: 'rgba(234, 67, 53, 0.2)' }]}>
+              <View style={[previewStyles.progressBarFill, { width: `${progress || 0}%`, backgroundColor: '#EA4335' }]} />
+            </View>
+          </View>
+        )}
+
+        <View style={previewStyles.info}>
+          <Text style={[previewStyles.name, { color: colors.textPrimary }]} numberOfLines={1}>{file.name}</Text>
+          <Text style={[previewStyles.size, { color: colors.textTertiary }]}>{formatFileSize(file.size)}</Text>
+        </View>
+
+        {isUploaded && (
+          <View style={[previewStyles.tickBadge, { backgroundColor: '#34A853' }]}>
+            <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
+          </View>
+        )}
       </View>
-
-      {isUploaded && (
-        <View style={[previewStyles.tickBadge, { backgroundColor: '#34A853' }]}>
-          <MaterialCommunityIcons name="check" size={12} color="#FFFFFF" />
-        </View>
-      )}
-    </View>
+    </ScaleTouchableOpacity>
   );
 }
 
@@ -103,6 +110,7 @@ export default function UploadScreen() {
   const [selectedModes, setSelectedModes] = useState<ExtractionMode[]>([]);
   const [customPrompt, setCustomPrompt] = useState('');
   const [jobTitle, setJobTitle] = useState('');
+  const [previewFile, setPreviewFile] = useState<{ uri: string; name: string; isImage: boolean } | null>(null);
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
   const allFilesUploaded = files.length > 0 && files.every((f) => f.status === FileStatus.UPLOADED);
@@ -229,7 +237,12 @@ export default function UploadScreen() {
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.previewScroll}>
                   {files.map((file) => (
                     <View key={file.id} style={styles.previewWrapper}>
-                      <FilePreviewCard file={file} colors={colors} progress={uploadProgress[file.id]} />
+                      <FilePreviewCard
+                        file={file}
+                        colors={colors}
+                        progress={uploadProgress[file.id]}
+                        onPress={() => setPreviewFile({ uri: file.uri, name: file.name, isImage: isImageFile(file.name) })}
+                      />
                       <TouchableOpacity onPress={() => removeFile(file.id)} style={[styles.removeBtn, { backgroundColor: colors.surface }]}>
                         <MaterialCommunityIcons name="close-circle" size={20} color={colors.error} />
                       </TouchableOpacity>
@@ -402,10 +415,73 @@ export default function UploadScreen() {
           totalFiles={progress?.totalFiles || 0}
           status={progress?.status || 'processing'}
         />
+
+        <Modal visible={!!previewFile} transparent animationType="fade" onRequestClose={() => setPreviewFile(null)}>
+          <View style={previewModalStyles.overlay}>
+            <TouchableOpacity style={previewModalStyles.closeBtn} onPress={() => setPreviewFile(null)}>
+              <MaterialCommunityIcons name="close" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={previewModalStyles.fileName} numberOfLines={1}>{previewFile?.name}</Text>
+            {previewFile?.isImage ? (
+              <Image source={{ uri: previewFile?.uri }} style={previewModalStyles.image} resizeMode="contain" />
+            ) : (
+              <View style={previewModalStyles.pdfContainer}>
+                <MaterialCommunityIcons name="file-pdf-box" size={80} color="#EA4335" />
+                <Text style={previewModalStyles.pdfText}>PDF Preview</Text>
+                <Text style={previewModalStyles.pdfHint}>PDF preview is available after extraction</Text>
+              </View>
+            )}
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 }
+
+const previewModalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  fileName: {
+    position: 'absolute',
+    top: 55,
+    left: 20,
+    right: 60,
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    zIndex: 10,
+  },
+  image: {
+    width: SCREEN_WIDTH - 40,
+    height: SCREEN_HEIGHT - 140,
+  },
+  pdfContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pdfText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+  pdfHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginTop: 8,
+  },
+});
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },

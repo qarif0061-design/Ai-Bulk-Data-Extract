@@ -16,6 +16,12 @@ const STREET_REGEX = /\d+\s+[A-Za-z0-9\s]+(?:Street|St|Avenue|Ave|Road|Rd|Boulev
 const ZIP_REGEX = /\b\d{5}(?:-\d{4})?\b/g;
 const INVOICE_NUM_REGEX = /(?:invoice|inv|bill|receipt)\s*(?:#|no|number|num|:|\s)\s*[A-Za-z0-9\-]+/gi;
 const COMPANY_SUFFIX = /(?:Inc|LLC|Ltd|Corp|Co|GmbH|S\.?A\.?|P\.?L\.?C\.?|Pty|Limited|Incorporated|Corporation|Company)\.?/gi;
+const DOB_REGEX = /\b(?:0[1-9]|[12]\d|3[01])[\/\-.](?:0[1-9]|1[0-2])[\/\-.](?:19|20)\d{2}\b/g;
+const AGE_REGEX = /\b(?:age|aged|years?\s*old|y\/o|yo)\s*[:\-]?\s*(\d{1,3})\b/gi;
+const AGE_STANDALONE = /\b(?:[1-9]\d?|1[01]\d|120)\s*(?:years?\s*old|y\/o|yo)\b/gi;
+const GENDER_KEYWORDS = /\b(male|female|man|woman|boy|girl|non[\-\s]binary|transgender|other)\b/gi;
+const SEX_VALUES = /\b(M|F|Male|Female|Other|Non[\-\s]binary)\b/g;
+const MARITAL_KEYWORDS = /\b(married|single|divorced|widowed|separated|unmarried|in a relationship|engaged|partner)\b/gi;
 
 export function extractDataLocally(text: string, mode: ExtractionMode, fileName: string): ExtractionResult {
   if (!text || text.trim().length === 0) {
@@ -47,6 +53,20 @@ export function extractDataLocally(text: string, mode: ExtractionMode, fileName:
       return { data: extractContacts(text), method: 'local' };
     case ExtractionMode.COMPANY_NAMES:
       return { data: extractCompanyNames(text), method: 'local' };
+    case ExtractionMode.FULL_NAME:
+      return { data: extractFullNames(text), method: 'local' };
+    case ExtractionMode.FIRST_NAME:
+      return { data: extractFirstNames(text), method: 'local' };
+    case ExtractionMode.LAST_NAME:
+      return { data: extractLastNames(text), method: 'local' };
+    case ExtractionMode.AGE:
+      return { data: extractAges(text), method: 'local' };
+    case ExtractionMode.GENDER:
+      return { data: extractGenders(text), method: 'local' };
+    case ExtractionMode.SEX:
+      return { data: extractSexes(text), method: 'local' };
+    case ExtractionMode.MARITAL_STATUS:
+      return { data: extractMaritalStatuses(text), method: 'local' };
     case ExtractionMode.CUSTOM:
       return { data: { raw: text, note: 'Custom extraction requires AI enhancement' }, method: 'local' };
     default:
@@ -173,7 +193,22 @@ function extractTableData(text: string): any[] {
 function extractEmails(text: string) {
   const matches = text.match(EMAIL_REGEX) || [];
   const unique = [...new Set(matches)];
-  return { emails: unique.map(email => ({ email, context: getContext(text, email) })) };
+  const cleaned = unique
+    .map(e => e.replace(/\s+/g, ''))
+    .filter(e => e.length > 5 && e.includes('@') && e.includes('.'))
+    .filter(e => !/\.(png|jpg|jpeg|gif|bmp|svg|webp)$/i.test(e))
+    .filter(e => e.split('@')[0].length >= 1)
+    .filter(e => {
+      const domain = e.split('@')[1];
+      return domain && domain.includes('.') && domain.split('.').pop()!.length >= 2;
+    });
+  return {
+    emails: cleaned.map(email => ({
+      email: email.toLowerCase(),
+      context: getContext(text, email),
+      confidence: email.length > 8 ? 'high' : 'medium',
+    })),
+  };
 }
 
 function extractPhoneNumbers(text: string) {
@@ -443,6 +478,143 @@ function extractCompanyNames(text: string) {
   return { companies };
 }
 
+function extractFullNames(text: string) {
+  const matches = text.match(NAME_REGEX) || [];
+  const filtered = matches.filter(n => !/^(?:The|This|That|And|For|Not|But|Are|Can|You|Our|Has|Had|Was|Were|Will|May|All|Any|Few|Most|Some|Please|Dear|Sincerely|Regards|From|To|Subject|Date|Re|Cc|Bcc)$/i.test(n));
+  const unique = [...new Set(filtered)];
+  return {
+    fullNames: unique.map(name => {
+      const parts = name.split(/\s+/);
+      const firstName = parts[0] || '';
+      const lastName = parts.length > 1 ? parts[parts.length - 1] : '';
+      const middleName = parts.length > 2 ? parts.slice(1, -1).join(' ') : '';
+      return {
+        firstName,
+        lastName,
+        middleName,
+        fullName: name,
+        context: getContext(text, name),
+      };
+    }),
+  };
+}
+
+function extractFirstNames(text: string) {
+  const matches = text.match(NAME_REGEX) || [];
+  const filtered = matches.filter(n => !/^(?:The|This|That|And|For|Not|But|Are|Can|You|Our|Has|Had|Was|Were|Will|May|All|Any|Few|Most|Some|Please|Dear|Sincerely|Regards|From|To|Subject|Date|Re|Cc|Bcc)$/i.test(n));
+  const firstNames = filtered.map(n => n.split(/\s+/)[0]).filter(Boolean);
+  const unique = [...new Set(firstNames)];
+  return {
+    firstNames: unique.map(firstName => ({
+      firstName,
+      context: getContext(text, firstName),
+    })),
+  };
+}
+
+function extractLastNames(text: string) {
+  const matches = text.match(NAME_REGEX) || [];
+  const filtered = matches.filter(n => !/^(?:The|This|That|And|For|Not|But|Are|Can|You|Our|Has|Had|Was|Were|Will|May|All|Any|Few|Most|Some|Please|Dear|Sincerely|Regards|From|To|Subject|Date|Re|Cc|Bcc)$/i.test(n));
+  const lastNames = filtered.map(n => n.split(/\s+/).pop()).filter(Boolean);
+  const unique = [...new Set(lastNames)];
+  return {
+    lastNames: unique.map(lastName => ({
+      lastName: lastName as string,
+      context: getContext(text, lastName as string),
+    })),
+  };
+}
+
+function extractAges(text: string) {
+  const ages: any[] = [];
+
+  const ageMatches = text.matchAll(AGE_REGEX);
+  for (const match of ageMatches) {
+    const age = parseInt(match[1]);
+    if (age > 0 && age < 150) {
+      ages.push({ age, context: getContext(text, match[0]) });
+    }
+  }
+
+  const standaloneMatches = text.matchAll(AGE_STANDALONE);
+  for (const match of standaloneMatches) {
+    const ageStr = match[0].match(/\d+/)?.[0];
+    if (ageStr) {
+      const age = parseInt(ageStr);
+      if (age > 0 && age < 150 && !ages.some(a => a.age === age)) {
+        ages.push({ age, context: getContext(text, match[0]) });
+      }
+    }
+  }
+
+  const dobMatches = text.matchAll(DOB_REGEX);
+  for (const match of dobMatches) {
+    const dob = match[0];
+    const parts = dob.split(/[\/\-\.]/);
+    if (parts.length === 3) {
+      const year = parseInt(parts[2]);
+      const month = parseInt(parts[1]) - 1;
+      const day = parseInt(parts[0]);
+      const birthDate = new Date(year, month, day);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      if (today.getMonth() < birthDate.getMonth() || (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      if (age > 0 && age < 150) {
+        ages.push({ age, dateOfBirth: dob, context: getContext(text, dob) });
+      }
+    }
+  }
+
+  return { ages };
+}
+
+function extractGenders(text: string) {
+  const matches = text.matchAll(GENDER_KEYWORDS);
+  const genders: any[] = [];
+  const seen = new Set<string>();
+  for (const match of matches) {
+    const gender = match[1];
+    const normalized = gender.charAt(0).toUpperCase() + gender.slice(1).toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      genders.push({ gender: normalized, context: getContext(text, match[0]) });
+    }
+  }
+  return { genders };
+}
+
+function extractSexes(text: string) {
+  const matches = text.matchAll(SEX_VALUES);
+  const sexes: any[] = [];
+  const seen = new Set<string>();
+  for (const match of matches) {
+    const sex = match[1];
+    const normalized = sex.length === 1 ? (sex.toUpperCase() === 'M' ? 'Male' : sex.toUpperCase() === 'F' ? 'Female' : sex) : sex.charAt(0).toUpperCase() + sex.slice(1).toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      sexes.push({ sex: normalized, originalValue: sex, context: getContext(text, match[0]) });
+    }
+  }
+  return { sexes };
+}
+
+function extractMaritalStatuses(text: string) {
+  const matches = text.matchAll(MARITAL_KEYWORDS);
+  const statuses: any[] = [];
+  const seen = new Set<string>();
+  for (const match of matches) {
+    const status = match[1];
+    const normalized = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      statuses.push({ status: normalized, context: getContext(text, match[0]) });
+    }
+  }
+  return { maritalStatuses: statuses };
+}
+
 function getContext(text: string, target: string, range = 80): string {
   const idx = text.indexOf(target);
   if (idx < 0) return '';
@@ -467,6 +639,13 @@ function getEmptyResult(mode: ExtractionMode): any {
     case ExtractionMode.BANK_TRANSACTIONS: return { transactions: [], openingBalance: 0, closingBalance: 0, accountNumber: '' };
     case ExtractionMode.CONTACTS: return { contacts: [] };
     case ExtractionMode.COMPANY_NAMES: return { companies: [] };
+    case ExtractionMode.FULL_NAME: return { fullNames: [] };
+    case ExtractionMode.FIRST_NAME: return { firstNames: [] };
+    case ExtractionMode.LAST_NAME: return { lastNames: [] };
+    case ExtractionMode.AGE: return { ages: [] };
+    case ExtractionMode.GENDER: return { genders: [] };
+    case ExtractionMode.SEX: return { sexes: [] };
+    case ExtractionMode.MARITAL_STATUS: return { maritalStatuses: [] };
     case ExtractionMode.CUSTOM: return { raw: '' };
     default: return {};
   }
